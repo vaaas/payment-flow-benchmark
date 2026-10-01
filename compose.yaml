@@ -23,12 +23,19 @@ services:
 
   api:
     <<: *application
-    command: [sh, -c, npm run migrate && exec npm run dev]
+    command:
+      - sh
+      - -ec
+      - |
+        npm ci --no-audit --no-fund
+        npm run migrate
+        exec npm run dev
     environment:
       DATABASE_URL: postgresql://postgres:benchmark@database:5432/checkout
     ports:
-      - 127.0.0.1:3000:3000
+      - 127.0.0.1:${API_PORT:-3000}:3000
     volumes:
+      - ./node_modules:/app/node_modules
       - ./src:/app/src:ro
       - ./migrations:/app/migrations:ro
       - ./openapi.json:/app/openapi.json:ro
@@ -64,7 +71,7 @@ services:
     command: [npm, run, 'format:check']
     volumes:
       - .:/app
-      - /app/node_modules
+      - ./node_modules:/app/node_modules
 
 volumes:
   database-data:

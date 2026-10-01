@@ -21,21 +21,28 @@ compose() {
 }
 
 start_development() {
-  compose up --build api
+  compose up --build --detach api
+  compose logs --follow api database
+}
+
+test_compose() {
+  compose --project-name payment-flow-benchmark-tests --profile test "$@"
 }
 
 run_tests() {
-  compose --profile test build tests
-  compose --profile test run --rm -T tests
+  test_compose build tests
+  test_compose run --rm -T tests
 }
 
-run_formatter() {
+run_npm() {
   compose --profile tools build tooling
-  compose --profile tools run --rm -T --no-deps tooling npm run "$1"
+  compose --profile tools run --rm -T --no-deps tooling npm ci --no-audit --no-fund
+  compose --profile tools run --rm -T --no-deps tooling npm "$@"
 }
 
 stop_services() {
-  compose --profile test --profile tools down
+  compose --profile tools down
+  test_compose down
 }
 
 show_usage() {
@@ -55,7 +62,7 @@ case "${1:-dev}" in
     compose build api
     ;;
   format | format:check)
-    run_formatter "$1"
+    run_npm run "$1"
     ;;
   stop)
     stop_services

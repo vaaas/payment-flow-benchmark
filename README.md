@@ -3,12 +3,12 @@
 Requires Docker with Compose, or Podman with a Compose provider; no host Node.js or PostgreSQL. All tooling runs in containers.
 
 - `./run dev`: build, start PostgreSQL, apply migrations, and serve at `http://localhost:3000`. Source files are mounted for live reload; restart after dependency or configuration changes.
-- `./run test`: compile and run Jest against a separate PostgreSQL service with database `checkout_test`.
+- `./run test`: compile and run Jest in a separate Compose project with PostgreSQL database `checkout_test`.
 - `./run format` / `./run format:check`: apply or check Prettier formatting, including the shell helper.
 - `./run build`: build the application image.
 - `./run stop`: remove service containers and networks, preserving development database data.
 
-[compose.yaml](compose.yaml) defines services, database health checks, ports, and volumes. Test and tooling services use separate profiles. Use `CONTAINER_ENGINE=podman` to select Podman. You can also use Compose directly, for example `docker compose up --build api`. Credentials are local benchmark defaults. Concurrent test runs share the test database and must be serialized.
+[compose.yaml](compose.yaml) defines services, database health checks, ports, and volumes. Test and tooling services use separate profiles. Use `CONTAINER_ENGINE=podman` to select Podman, or `API_PORT=3001` to change the local API port. You can also use Compose directly, for example `docker compose up --build api`. Container-installed dependencies are bind-mounted at `./node_modules` for local editors; dependency installation runs before dev and formatter commands. Credentials are local benchmark defaults. Concurrent test runs share the test database and must be serialized.
 
 ## API
 
