@@ -32,6 +32,7 @@ services:
         exec npm run dev
     environment:
       DATABASE_URL: postgresql://postgres:benchmark@database:5432/checkout
+      API_KEY: ${API_KEY:-benchmark-api-key}
     ports:
       - 127.0.0.1:${API_PORT:-3000}:3000
     volumes:

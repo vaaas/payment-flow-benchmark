@@ -19,6 +19,8 @@ Environment variables are read only by the immutable `Configuration` class via `
 
 ## API
 
+Checkout creation and order lookup require `Authorization: Bearer benchmark-api-key`. Set `API_KEY` to override the sample shared key. Missing or invalid credentials return 401 with `WWW-Authenticate: Bearer`. Webhooks and OpenAPI remain public. This sample has one shared identity; it does not implement merchant authorization, key rotation, or rate limiting.
+
 The [OpenAPI 3.1 spec](openapi.json) is served at `GET /openapi.json`, with schemas, examples, validation rules, and retry/conflict behavior. Import it into an OpenAPI client or editor.
 
 - `POST /checkout-intents`: `{"businessOrderReference":"merchant-123","amountMinor":"1999","currency":"EUR"}`. Returns 201 for creation, 200 for matching retries, with `{id,businessOrderReference,amountMinor,currency,status,createdAt,updatedAt}`. Timestamps are UTC ISO strings. Changed amount/currency returns 409.
@@ -47,4 +49,4 @@ The composition root (`src/main.ts`) configures a `Container` with separate clas
 
 There is no UI, external payment call, background queue, or deployment infrastructure. A dedicated load generator and measured latency/throughput results are unfinished; concurrent correctness tests are not performance measurements. A next step would be a containerized load test with fixed hardware, realistic traffic, pool sizes and percentile latency reporting. Connection-loss-at-commit is explained through transaction/idempotency behavior but not fault-injected; add a PostgreSQL network proxy to verify that path.
 
-Before production: scope references by merchant and event IDs by provider, validate supported currencies, add authentication and webhook signatures, protect secrets, bound database statement/lock durations, rate-limit inputs, instrument errors/latency/lock contention, document provider retry behavior, and add backup/restore and migration upgrade checks. Those are intentionally not built here. For ORM API details see the [Drizzle PostgreSQL documentation](https://orm.drizzle.team/docs/get-started/postgresql-existing).
+Before production: scope references by merchant and event IDs by provider, validate supported currencies, add merchant authentication/authorization and webhook signatures, protect secrets, bound database statement/lock durations, rate-limit inputs, instrument errors/latency/lock contention, document provider retry behavior, and add backup/restore and migration upgrade checks. Those are intentionally not built here. For ORM API details see the [Drizzle PostgreSQL documentation](https://orm.drizzle.team/docs/get-started/postgresql-existing).
