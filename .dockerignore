@@ -4,3 +4,8 @@ dist
 .agents
 .aws
 .codex
+.env
+.env.*
+*.pem
+*.key
+coverage
