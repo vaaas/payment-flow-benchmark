@@ -24,10 +24,20 @@ export class ErrorHandler {
       typeof error === 'object' &&
       error !== null &&
       'type' in error &&
-      (error.type === 'entity.parse.failed' ||
-        error.type === 'entity.too.large') &&
+      typeof error.type === 'string' &&
+      [
+        'entity.parse.failed',
+        'entity.too.large',
+        'entity.verify.failed',
+        'request.aborted',
+        'request.size.invalid',
+        'charset.unsupported',
+        'encoding.unsupported',
+      ].includes(error.type) &&
       'status' in error &&
-      typeof error.status === 'number'
+      typeof error.status === 'number' &&
+      error.status >= 400 &&
+      error.status < 500
     ) {
       return new HttpError(error.status, 'Invalid JSON body');
     }

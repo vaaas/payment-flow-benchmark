@@ -248,3 +248,44 @@ test.each(['', 'x'.repeat(129)])(
     expect(store.create).not.toHaveBeenCalled();
   },
 );
+
+test.each(['iso-8859-1', 'unsupported'])(
+  'unsupported JSON charset remains a client error: %s',
+  async (charset) => {
+    const response = await request(app)
+      .post('/checkout-intents')
+      .set('Authorization', `Bearer ${configuration.apiKey}`)
+      .set('Content-Type', `application/json; charset=${charset}`)
+      .send(JSON.stringify(checkoutPayload));
+    expect(response.status).toBe(415);
+    expect(response.body.error).toBe('Invalid JSON body');
+    expect(store.create).not.toHaveBeenCalled();
+  },
+);
+
+test('unsupported content encoding remains a client error', async () => {
+  const response = await request(app)
+    .post('/checkout-intents')
+    .set('Authorization', `Bearer ${configuration.apiKey}`)
+    .set('Content-Encoding', 'unsupported')
+    .send(checkoutPayload);
+  expect(response.status).toBe(415);
+  expect(store.create).not.toHaveBeenCalled();
+});
+
+test.each(['a\u0000b', '\ud800', '\udc00'])(
+  'invalid PostgreSQL identifiers are rejected before checkout and webhook persistence: %j',
+  async (identifier) => {
+    const checkout = await request(app)
+      .post('/checkout-intents')
+      .set('Authorization', `Bearer ${configuration.apiKey}`)
+      .send({ ...checkoutPayload, businessOrderReference: identifier });
+    const webhook = await request(app)
+      .post('/webhooks/payment')
+      .send({ eventId: identifier, orderId: order.id, outcome: 'succeeded' });
+    expect(checkout.status).toBe(400);
+    expect(webhook.status).toBe(400);
+    expect(store.create).not.toHaveBeenCalled();
+    expect(store.receive).not.toHaveBeenCalled();
+  },
+);
