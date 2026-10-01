@@ -1,5 +1,5 @@
-import type { Checkout } from '#src/checkout/domain/create-checkout';
-import type { PaymentOutcome } from '#src/payments/domain/receive-webhook';
+import type { Checkout } from '#src/features/checkout/domain/create-checkout';
+import type { PaymentOutcome } from '#src/features/payments/domain/receive-webhook';
 
 export type PaymentStatus = 'pending' | PaymentOutcome;
 

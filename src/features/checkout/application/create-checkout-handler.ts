@@ -1,7 +1,7 @@
 import type { Container } from '#src/application/dependency-injection/container';
 import type { EventHandler } from '#src/application/event-handler';
-import type { CreateCheckout } from '#src/checkout/domain/create-checkout';
-import { OrderStore } from '#src/orders/domain/order-store';
+import type { CreateCheckout } from '#src/features/checkout/domain/create-checkout';
+import { OrderStore } from '#src/features/orders/domain/order-store';
 
 export class CreateCheckoutHandler implements EventHandler<CreateCheckout> {
   public static provide(container: Container): CreateCheckoutHandler {

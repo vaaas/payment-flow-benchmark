@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import type { Bus } from '#src/application/bus';
-import { GetOrder } from '#src/orders/domain/get-order';
+import { GetOrder } from '#src/features/orders/domain/get-order';
 
 export class GetOrderRoute {
   constructor(private readonly bus: Bus) {}

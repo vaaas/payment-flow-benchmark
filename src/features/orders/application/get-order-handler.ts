@@ -1,7 +1,7 @@
 import type { Container } from '#src/application/dependency-injection/container';
 import type { EventHandler } from '#src/application/event-handler';
-import type { GetOrder } from '#src/orders/domain/get-order';
-import { OrderStore } from '#src/orders/domain/order-store';
+import type { GetOrder } from '#src/features/orders/domain/get-order';
+import { OrderStore } from '#src/features/orders/domain/order-store';
 
 export class GetOrderHandler implements EventHandler<GetOrder> {
   public static provide(container: Container): GetOrderHandler {

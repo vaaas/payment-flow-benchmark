@@ -1,5 +1,5 @@
 import { Event } from '#src/application/event';
-import type { OrderStore } from '#src/orders/domain/order-store';
+import type { OrderStore } from '#src/features/orders/domain/order-store';
 import { z } from 'zod';
 
 export class GetOrder extends Event<Awaited<ReturnType<OrderStore['get']>>> {

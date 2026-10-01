@@ -7,7 +7,7 @@ import {
   serial,
   integer,
 } from 'drizzle-orm/pg-core';
-import type { PaymentStatus } from '#src/orders/domain/order';
+import type { PaymentStatus } from '#src/features/orders/domain/order';
 export const orders = pgTable('orders', {
   id: serial('id').primaryKey(),
   publicId: uuid('public_id').notNull().unique(),

@@ -1,7 +1,7 @@
 import type { Container } from '#src/application/dependency-injection/container';
 import type { EventHandler } from '#src/application/event-handler';
-import type { ReceiveWebhook } from '#src/payments/domain/receive-webhook';
-import { OrderStore } from '#src/orders/domain/order-store';
+import type { ReceiveWebhook } from '#src/features/payments/domain/receive-webhook';
+import { OrderStore } from '#src/features/orders/domain/order-store';
 
 export class ReceiveWebhookHandler implements EventHandler<ReceiveWebhook> {
   public static provide(container: Container): ReceiveWebhookHandler {

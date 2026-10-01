@@ -1,6 +1,6 @@
 import { installBus } from '#src/bootstrap/install-bus';
 import { Container } from '#src/application/dependency-injection/container';
-import { OrderStore } from '#src/orders/domain/order-store';
+import { OrderStore } from '#src/features/orders/domain/order-store';
 import { Pool } from 'pg';
 import { Configuration } from '#src/configuration/configuration';
 import { App } from '#src/http/app';

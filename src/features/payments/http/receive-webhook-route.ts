@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import type { Bus } from '#src/application/bus';
-import { ReceiveWebhook } from '#src/payments/domain/receive-webhook';
+import { ReceiveWebhook } from '#src/features/payments/domain/receive-webhook';
 
 export class ReceiveWebhookRoute {
   constructor(private readonly bus: Bus) {}

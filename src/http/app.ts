@@ -1,9 +1,9 @@
 import type { Container } from '#src/application/dependency-injection/container';
 import express, { Express } from 'express';
 import { Bus } from '#src/application/bus';
-import { CreateCheckoutRoute } from '#src/checkout/http/create-checkout-route';
-import { GetOrderRoute } from '#src/orders/http/get-order-route';
-import { ReceiveWebhookRoute } from '#src/payments/http/receive-webhook-route';
+import { CreateCheckoutRoute } from '#src/features/checkout/http/create-checkout-route';
+import { GetOrderRoute } from '#src/features/orders/http/get-order-route';
+import { ReceiveWebhookRoute } from '#src/features/payments/http/receive-webhook-route';
 import { ErrorHandler } from '#src/http/error-handler';
 import { NotFoundRoute } from '#src/http/not-found-route';
 import { OpenApiRoute } from '#src/http/openapi-route';

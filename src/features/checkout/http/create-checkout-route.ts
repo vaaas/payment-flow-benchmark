@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import type { Bus } from '#src/application/bus';
-import { CreateCheckout } from '#src/checkout/domain/create-checkout';
+import { CreateCheckout } from '#src/features/checkout/domain/create-checkout';
 
 export class CreateCheckoutRoute {
   constructor(private readonly bus: Bus) {}

@@ -1,6 +1,6 @@
-import type { Checkout } from '#src/checkout/domain/create-checkout';
-import type { ProviderEvent } from '#src/payments/domain/receive-webhook';
-import type { Order } from '#src/orders/domain/order';
+import type { Checkout } from '#src/features/checkout/domain/create-checkout';
+import type { ProviderEvent } from '#src/features/payments/domain/receive-webhook';
+import type { Order } from '#src/features/orders/domain/order';
 
 export abstract class OrderStore {
   abstract create(

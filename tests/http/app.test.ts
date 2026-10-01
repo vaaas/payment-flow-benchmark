@@ -7,12 +7,12 @@ import type {
 import request from 'supertest';
 import { App } from '#src/http/app';
 import { Bus } from '#src/application/bus';
-import { OrderStore } from '#src/orders/domain/order-store';
-import { OrderNotFound } from '#src/orders/domain/order-not-found';
-import { Order } from '#src/orders/domain/order';
-import { CreateCheckout } from '#src/checkout/domain/create-checkout';
-import { ReceiveWebhook } from '#src/payments/domain/receive-webhook';
-import { GetOrder } from '#src/orders/domain/get-order';
+import { OrderStore } from '#src/features/orders/domain/order-store';
+import { OrderNotFound } from '#src/features/orders/domain/order-not-found';
+import { Order } from '#src/features/orders/domain/order';
+import { CreateCheckout } from '#src/features/checkout/domain/create-checkout';
+import { ReceiveWebhook } from '#src/features/payments/domain/receive-webhook';
+import { GetOrder } from '#src/features/orders/domain/get-order';
 const store: jest.Mocked<OrderStore> = {
   create: jest.fn(),
   receive: jest.fn(),

@@ -1,5 +1,5 @@
 import { installBus } from '#src/bootstrap/install-bus';
-import { OrderStore } from '#src/orders/domain/order-store';
+import { OrderStore } from '#src/features/orders/domain/order-store';
 import { Container } from '#src/application/dependency-injection/container';
 import request from 'supertest';
 import { Configuration } from '#src/configuration/configuration';
