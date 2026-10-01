@@ -7,7 +7,7 @@ export async function migrate(pool: Pool) {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(725831)');
     await client.query(
-      'CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY)',
+      'CREATE TABLE IF NOT EXISTS schema_migrations (id serial PRIMARY KEY, version text NOT NULL UNIQUE)',
     );
     const applied = await client.query<{ version: string }>(
       'SELECT version FROM schema_migrations',
