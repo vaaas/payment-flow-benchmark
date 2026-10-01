@@ -17,7 +17,7 @@ export async function migrate(pool: Pool) {
       .filter((filename) => /^\d+_.+\.sql$/.test(filename))
       .sort();
     for (const filename of filenames) {
-      const version = filename.split('_')[0];
+      const version = filename.slice(0, filename.indexOf('_'));
       if (appliedVersions.has(version)) continue;
       await client.query(await readFile(`migrations/${filename}`, 'utf8'));
       await client.query(

@@ -50,6 +50,7 @@ export class PostgresOrderStore implements OrderStore {
               eq(orders.businessOrderReference, payload.businessOrderReference),
             )
         )[0];
+      if (!row) throw new Error('Checkout order disappeared during creation');
       const order = toOrder(row);
       if (!order.matchesCheckout(payload)) throw new CheckoutConflict();
       return { order, created: inserted.length === 1 };
@@ -74,6 +75,8 @@ export class PostgresOrderStore implements OrderStore {
             .select()
             .from(providerEvents)
             .where(eq(providerEvents.eventId, payload.eventId));
+          if (!existing)
+            throw new Error('Provider event disappeared during processing');
           if (
             existing.orderId !== order.id ||
             existing.outcome !== payload.outcome
@@ -89,9 +92,18 @@ export class PostgresOrderStore implements OrderStore {
             .where(eq(orders.id, order.id));
         return { duplicate: false };
       })
-      .catch((error) => {
-        if (error.code === '23503' || error.cause?.code === '23503')
-          throw new OrderNotFound();
+      .catch((error: unknown) => {
+        if (typeof error === 'object' && error !== null) {
+          const cause = 'cause' in error ? error.cause : undefined;
+          if (
+            ('code' in error && error.code === '23503') ||
+            (typeof cause === 'object' &&
+              cause !== null &&
+              'code' in cause &&
+              cause.code === '23503')
+          )
+            throw new OrderNotFound();
+        }
         throw error;
       });
   }

@@ -47,8 +47,10 @@ test('concurrent checkout retries create exactly one immutable order', async () 
     409,
   );
   expect((await checkout({ ...payload, currency: 'USD' })).status).toBe(409);
+  const firstResponse = responses[0];
+  if (!firstResponse) throw new Error('Expected checkout responses');
   expect(
-    (await request(app).get(`/orders/${responses[0].body.id}`)).body
+    (await request(app).get(`/orders/${firstResponse.body.id}`)).body
       .amountMinor,
   ).toBe('1999');
   expect((await pool.query('SELECT * FROM orders')).rowCount).toBe(1);

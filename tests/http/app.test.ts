@@ -97,7 +97,7 @@ test('checkout route dispatches a parsed immutable domain command', async () => 
   expect(response.status).toBe(201);
   expect(response.body).toEqual({ ...order });
   expect(dispatch).toHaveBeenCalledWith(expect.any(CreateCheckout));
-  const command = dispatch.mock.calls[0][0];
+  const command = dispatch.mock.calls[0]?.[0];
   if (!(command instanceof CreateCheckout))
     throw new Error('Expected CreateCheckout');
   expect(command.payload).toEqual(checkoutPayload);
@@ -114,7 +114,7 @@ test('webhook route dispatches a parsed immutable domain command', async () => {
   expect(response.status).toBe(200);
   expect(response.body).toEqual({ duplicate: false });
   expect(dispatch).toHaveBeenCalledWith(expect.any(ReceiveWebhook));
-  const command = dispatch.mock.calls[0][0];
+  const command = dispatch.mock.calls[0]?.[0];
   if (!(command instanceof ReceiveWebhook))
     throw new Error('Expected ReceiveWebhook');
   expect(command.payload).toEqual(payload);
@@ -130,10 +130,10 @@ test('order route dispatches a parsed immutable domain query', async () => {
   expect(response.status).toBe(200);
   expect(response.body).toEqual({ ...order });
   expect(dispatch).toHaveBeenCalledWith(expect.any(GetOrder));
-  const query = dispatch.mock.calls[0][0];
+  const query = dispatch.mock.calls[0]?.[0];
   if (!(query instanceof GetOrder)) throw new Error('Expected GetOrder');
   expect(query.id).toBe(order.id);
-  expect(Object.isFrozen(dispatch.mock.calls[0][0])).toBe(true);
+  expect(Object.isFrozen(query)).toBe(true);
 });
 
 test.each([
