@@ -46,7 +46,7 @@ stop_services() {
 }
 
 show_usage() {
-  echo 'Usage: ./run [dev|test|build|format|format:check|stop]'
+  echo 'Usage: ./run [dev|test|build|format|format:check|npm ...|stop]'
 }
 
 container_engine=$(select_container_engine)
@@ -63,6 +63,10 @@ case "${1:-dev}" in
     ;;
   format | format:check)
     run_npm run "$1"
+    ;;
+  npm)
+    shift
+    run_npm "$@"
     ;;
   stop)
     stop_services
