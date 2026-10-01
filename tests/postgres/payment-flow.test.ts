@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { Pool } from 'pg';
+import { Configuration } from '#src/configuration/configuration';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { randomUUID } from 'node:crypto';
 import { App } from '#src/http/app';
@@ -7,7 +8,8 @@ import { CommandBus } from '#src/application/command-bus';
 import { QueryBus } from '#src/application/query-bus';
 import { PostgresOrderStore } from '#src/infrastructure/postgres/postgres-order-store';
 import { migrate } from '#src/infrastructure/postgres/migrate';
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 20 });
+const configuration = Configuration.fromEnv();
+const pool = new Pool({ connectionString: configuration.databaseUrl, max: 20 });
 const store = new PostgresOrderStore(drizzle(pool));
 const app = new App(new CommandBus(store), new QueryBus(store)).http;
 const payload = {
@@ -20,7 +22,7 @@ const checkout = (body = payload) =>
 const webhook = (orderId: string, eventId: string, outcome = 'succeeded') =>
   request(app).post('/webhooks/payment').send({ orderId, eventId, outcome });
 beforeAll(async () => {
-  if (!process.env.DATABASE_URL?.endsWith('/checkout_test'))
+  if (!configuration.databaseUrl.endsWith('/checkout_test'))
     throw new Error('Tests require the dedicated checkout_test database');
   await migrate(pool);
 });

@@ -16,6 +16,15 @@ module.exports = [
     languageOptions: { parser: typescriptParser },
     linterOptions: { noInlineConfig: true },
     rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'process',
+          property: 'env',
+          message:
+            'Read environment variables through Configuration.fromEnv().',
+        },
+      ],
       'no-restricted-imports': [
         'error',
         {
@@ -48,5 +57,9 @@ module.exports = [
         },
       ],
     },
+  },
+  {
+    files: ['src/configuration/configuration.ts'],
+    rules: { 'no-restricted-properties': 'off' },
   },
 ];

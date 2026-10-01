@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
+import { Configuration } from '#src/configuration/configuration';
 export async function migrate(pool: Pool) {
   const client = await pool.connect();
   try {
@@ -25,7 +26,8 @@ export async function migrate(pool: Pool) {
   }
 }
 if (require.main === module) {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const configuration = Configuration.fromEnv();
+  const pool = new Pool({ connectionString: configuration.databaseUrl });
   migrate(pool)
     .catch((error) => {
       console.error(error);
