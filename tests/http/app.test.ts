@@ -1,3 +1,4 @@
+import { Container } from '#src/application/dependency-injection/container';
 import type {
   ErrorResponse,
   IRespondable,
@@ -8,7 +9,7 @@ import { Bus } from '#src/application/bus';
 import { CreateCheckoutHandler } from '#src/checkout/application/create-checkout-handler';
 import { ReceiveWebhookHandler } from '#src/payments/application/receive-webhook-handler';
 import { GetOrderHandler } from '#src/orders/application/get-order-handler';
-import type { OrderStore } from '#src/orders/domain/order-store';
+import { OrderStore } from '#src/orders/domain/order-store';
 import { OrderNotFound } from '#src/orders/domain/order-not-found';
 import { Order } from '#src/orders/domain/order';
 import { CreateCheckout } from '#src/checkout/domain/create-checkout';
@@ -19,11 +20,13 @@ const store: jest.Mocked<OrderStore> = {
   receive: jest.fn(),
   get: jest.fn(),
 };
+const container = new Container().registerInstance(OrderStore, store);
 const bus = new Bus()
-  .on(CreateCheckout, new CreateCheckoutHandler(store))
-  .on(ReceiveWebhook, new ReceiveWebhookHandler(store))
-  .on(GetOrder, new GetOrderHandler(store));
-const app = new App(bus).http;
+  .on(CreateCheckout, container.get(CreateCheckoutHandler))
+  .on(ReceiveWebhook, container.get(ReceiveWebhookHandler))
+  .on(GetOrder, container.get(GetOrderHandler));
+container.registerInstance(Bus, bus);
+const app = container.get(App).http;
 beforeEach(() => jest.resetAllMocks());
 afterEach(() => jest.restoreAllMocks());
 test('invalid JSON and unknown fields never reach persistence', async () => {

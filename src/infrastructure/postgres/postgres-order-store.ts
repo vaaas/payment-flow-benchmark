@@ -1,3 +1,6 @@
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import type { Container } from '#src/application/dependency-injection/container';
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -21,6 +24,10 @@ const toOrder = (row: typeof orders.$inferSelect): Order =>
   });
 
 export class PostgresOrderStore implements OrderStore {
+  public static provide(container: Container): PostgresOrderStore {
+    return new PostgresOrderStore(drizzle(container.get(Pool)));
+  }
+
   constructor(private readonly db: NodePgDatabase) {}
   async create(payload: Checkout) {
     return this.db.transaction(async (tx) => {

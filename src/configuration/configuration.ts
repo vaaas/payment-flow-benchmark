@@ -1,6 +1,11 @@
+import type { Container } from '#src/application/dependency-injection/container';
 import { z } from 'zod';
 
 export class Configuration {
+  public static provide(_container: Container): Configuration {
+    return Configuration.fromEnv();
+  }
+
   private static readonly schema = z.object({
     DATABASE_URL: z
       .string()

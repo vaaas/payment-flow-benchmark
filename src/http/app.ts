@@ -1,5 +1,6 @@
+import type { Container } from '#src/application/dependency-injection/container';
 import express, { Express } from 'express';
-import type { Bus } from '#src/application/bus';
+import { Bus } from '#src/application/bus';
 import { CreateCheckoutRoute } from '#src/checkout/http/create-checkout-route';
 import { GetOrderRoute } from '#src/orders/http/get-order-route';
 import { ReceiveWebhookRoute } from '#src/payments/http/receive-webhook-route';
@@ -8,6 +9,10 @@ import { NotFoundRoute } from '#src/http/not-found-route';
 import { OpenApiRoute } from '#src/http/openapi-route';
 
 export class App {
+  public static provide(container: Container): App {
+    return new App(container.get(Bus));
+  }
+
   public readonly http: Express;
 
   constructor(bus: Bus) {
