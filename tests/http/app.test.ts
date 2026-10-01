@@ -111,6 +111,7 @@ test('checkout route dispatches a parsed immutable domain command', async () => 
   const dispatch = jest.spyOn(bus, 'dispatch');
   const response = await request(app)
     .post('/checkout-intents')
+    .set('Idempotency-Key', 'checkout-submission')
     .set('Authorization', `Bearer ${configuration.apiKey}`)
     .send(checkoutPayload);
 
@@ -121,6 +122,11 @@ test('checkout route dispatches a parsed immutable domain command', async () => 
   if (!(command instanceof CreateCheckout))
     throw new Error('Expected CreateCheckout');
   expect(command.payload).toEqual(checkoutPayload);
+  expect(command.idempotencyKey).toBe('checkout-submission');
+  expect(store.create).toHaveBeenCalledWith(
+    checkoutPayload,
+    'checkout-submission',
+  );
   expect(Object.isFrozen(command)).toBe(true);
   expect(Object.isFrozen(command.payload)).toBe(true);
 });
@@ -227,5 +233,18 @@ test.each([
       error: 'Processing failed; retry the identical request',
     });
     expect(log).toHaveBeenCalledWith(error);
+  },
+);
+
+test.each(['', 'x'.repeat(129)])(
+  'invalid idempotency keys never reach persistence: %s',
+  async (key) => {
+    const response = await request(app)
+      .post('/checkout-intents')
+      .set('Authorization', `Bearer ${configuration.apiKey}`)
+      .set('Idempotency-Key', key)
+      .send(checkoutPayload);
+    expect(response.status).toBe(400);
+    expect(store.create).not.toHaveBeenCalled();
   },
 );

@@ -15,3 +15,10 @@ CREATE TABLE provider_events (
   outcome text NOT NULL CHECK (outcome IN ('failed', 'succeeded')),
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+CREATE TABLE checkout_idempotency_keys (
+  id serial PRIMARY KEY,
+  key text NOT NULL UNIQUE CHECK (length(key) BETWEEN 1 AND 128),
+  order_id integer NOT NULL REFERENCES orders(id),
+  created_at timestamptz NOT NULL DEFAULT now()
+);

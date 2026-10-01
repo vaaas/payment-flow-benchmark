@@ -48,7 +48,7 @@ test('one feature installation wires its dependencies, events and routes without
     .send(payload);
   expect(response.status).toBe(201);
   expect(response.body.id).toBe(order.id);
-  expect(store.create).toHaveBeenCalledWith(payload);
+  expect(store.create).toHaveBeenCalledWith(payload, undefined);
   expect(
     (
       await request(app.http)

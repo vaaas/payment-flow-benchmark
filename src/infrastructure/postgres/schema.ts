@@ -33,3 +33,14 @@ export const providerEvents = pgTable('provider_events', {
     .notNull()
     .defaultNow(),
 });
+
+export const checkoutIdempotencyKeys = pgTable('checkout_idempotency_keys', {
+  id: serial('id').primaryKey(),
+  key: text('key').notNull().unique(),
+  orderId: integer('order_id')
+    .notNull()
+    .references(() => orders.id),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});

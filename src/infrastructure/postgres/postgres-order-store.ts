@@ -2,7 +2,7 @@ import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { Container } from '#src/application/dependency-injection/container';
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Checkout } from '#src/features/checkout/domain/create-checkout';
 import { CheckoutConflict } from '#src/features/checkout/domain/checkout-conflict';
@@ -11,7 +11,11 @@ import { OrderNotFound } from '#src/features/orders/domain/order-not-found';
 import type { OrderStore } from '#src/features/orders/domain/order-store';
 import type { ProviderEvent } from '#src/features/payments/domain/receive-webhook';
 import { ProviderEventConflict } from '#src/features/payments/domain/provider-event-conflict';
-import { orders, providerEvents } from '#src/infrastructure/postgres/schema';
+import {
+  orders,
+  providerEvents,
+  checkoutIdempotencyKeys,
+} from '#src/infrastructure/postgres/schema';
 const toOrder = (row: typeof orders.$inferSelect): Order =>
   new Order({
     id: row.publicId,
@@ -29,8 +33,19 @@ export class PostgresOrderStore implements OrderStore {
   }
 
   constructor(private readonly db: NodePgDatabase) {}
-  async create(payload: Checkout) {
+  async create(payload: Checkout, idempotencyKey?: string) {
     return this.db.transaction(async (tx) => {
+      if (idempotencyKey !== undefined) {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtextextended(${idempotencyKey}, 1))`,
+        );
+        const [existing] = await tx
+          .select({ order: orders })
+          .from(checkoutIdempotencyKeys)
+          .innerJoin(orders, eq(checkoutIdempotencyKeys.orderId, orders.id))
+          .where(eq(checkoutIdempotencyKeys.key, idempotencyKey));
+        if (existing) return { order: toOrder(existing.order), created: false };
+      }
       const inserted = await tx
         .insert(orders)
         .values({
@@ -53,6 +68,11 @@ export class PostgresOrderStore implements OrderStore {
       if (!row) throw new Error('Checkout order disappeared during creation');
       const order = toOrder(row);
       if (!order.matchesCheckout(payload)) throw new CheckoutConflict();
+      if (idempotencyKey !== undefined) {
+        await tx
+          .insert(checkoutIdempotencyKeys)
+          .values({ key: idempotencyKey, orderId: row.id });
+      }
       return { order, created: inserted.length === 1 };
     });
   }

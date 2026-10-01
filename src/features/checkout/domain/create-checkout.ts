@@ -23,13 +23,19 @@ export class CreateCheckout extends Event<
     currency: z.string().regex(/^[A-Z]{3}$/),
   });
 
-  public static from(input: unknown): CreateCheckout {
-    return new CreateCheckout(CreateCheckout.schema.parse(input));
+  public static from(input: unknown, idempotencyKey?: unknown): CreateCheckout {
+    return new CreateCheckout(
+      CreateCheckout.schema.parse(input),
+      identifierSchema.optional().parse(idempotencyKey),
+    );
   }
 
   public readonly payload: Checkout;
 
-  private constructor(payload: Checkout) {
+  private constructor(
+    payload: Checkout,
+    public readonly idempotencyKey: string | undefined,
+  ) {
     super();
     this.payload = Object.freeze({ ...payload });
     Object.freeze(this);

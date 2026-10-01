@@ -11,6 +11,6 @@ export class CreateCheckoutHandler implements EventHandler<CreateCheckout> {
   constructor(private readonly store: OrderStore) {}
 
   public handle(event: CreateCheckout) {
-    return this.store.create(event.payload);
+    return this.store.create(event.payload, event.idempotencyKey);
   }
 }

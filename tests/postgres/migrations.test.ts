@@ -39,6 +39,7 @@ test('fresh migrations are repeatable and leave integer primary keys without pol
     await database.query(`SELECT table_name, data_type FROM information_schema.columns
     WHERE table_schema='migration_test' AND column_name='id' ORDER BY table_name`);
   expect(keys.rows).toEqual([
+    { table_name: 'checkout_idempotency_keys', data_type: 'integer' },
     { table_name: 'orders', data_type: 'integer' },
     { table_name: 'provider_events', data_type: 'integer' },
     { table_name: 'schema_migrations', data_type: 'integer' },

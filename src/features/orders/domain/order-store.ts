@@ -5,6 +5,7 @@ import type { Order } from '#src/features/orders/domain/order';
 export abstract class OrderStore {
   abstract create(
     payload: Checkout,
+    idempotencyKey?: string,
   ): Promise<{ order: Order; created: boolean }>;
   abstract receive(payload: ProviderEvent): Promise<{ duplicate: boolean }>;
   abstract get(id: string): Promise<Order>;
