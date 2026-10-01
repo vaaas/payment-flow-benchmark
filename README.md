@@ -13,6 +13,8 @@ Requires Docker with Compose, or Podman with a Compose provider; no host Node.js
 
 Project imports use `#src/...` and `#openapi`; relative imports are forbidden by ESLint. Run `./run npm run lint` explicitly; builds and tests also enforce it. Aliases resolve in tsx, Jest, and compiled Node.js.
 
+TypeScript checks source and tests with strict typing, checked indexed access, exact optional properties, unused imports/locals/parameters, overrides, and control-flow checks. Compiler errors prevent emission. Dependency declarations are skipped with `skipLibCheck`; `node_modules`, build output, and coverage are excluded as project inputs.
+
 Environment variables are read only by the immutable `Configuration` class via `Configuration.fromEnv(env = process.env)`. It validates the PostgreSQL URL; service startup, migrations, and tests use the same configuration object. ESLint forbids direct `process.env` access elsewhere.
 
 ## API
