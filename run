@@ -3,21 +3,21 @@ set -euo pipefail
 cd "$(dirname "$0")"
 engine="${CONTAINER_ENGINE:-}"
 if [[ -z "$engine" ]]; then
-  if command -v docker >/dev/null; then engine=docker; else engine=podman; fi
+  if command -v docker > /dev/null; then engine=docker; else engine=podman; fi
 fi
 runtime=("$engine")
 if [[ "$engine" == podman && -n "${PODMAN_ROOT:-}" ]]; then runtime+=(--root "$PODMAN_ROOT" --runroot "${PODMAN_RUNROOT:-/tmp/payment-podman-run}"); fi
 network=payment-benchmark
 image=payment-benchmark-app
 start_database() {
-  "${runtime[@]}" network inspect "$network" >/dev/null 2>&1 || "${runtime[@]}" network create "$network" >/dev/null
-  if ! "${runtime[@]}" container inspect payment-benchmark-db >/dev/null 2>&1; then
-    "${runtime[@]}" run -d --name payment-benchmark-db --network "$network" -e POSTGRES_PASSWORD=benchmark -e POSTGRES_DB=checkout -v payment-benchmark-data:/var/lib/postgresql/data docker.io/library/postgres:17.6 >/dev/null
+  "${runtime[@]}" network inspect "$network" > /dev/null 2>&1 || "${runtime[@]}" network create "$network" > /dev/null
+  if ! "${runtime[@]}" container inspect payment-benchmark-db > /dev/null 2>&1; then
+    "${runtime[@]}" run -d --name payment-benchmark-db --network "$network" -e POSTGRES_PASSWORD=benchmark -e POSTGRES_DB=checkout -v payment-benchmark-data:/var/lib/postgresql/data docker.io/library/postgres:17.6 > /dev/null
   else
-    "${runtime[@]}" start payment-benchmark-db >/dev/null
+    "${runtime[@]}" start payment-benchmark-db > /dev/null
   fi
   for attempt in {1..60}; do
-    if "${runtime[@]}" exec payment-benchmark-db pg_isready -U postgres -d checkout >/dev/null 2>&1; then return; fi
+    if "${runtime[@]}" exec payment-benchmark-db pg_isready -U postgres -d checkout > /dev/null 2>&1; then return; fi
     sleep 1
   done
   echo 'PostgreSQL did not become ready' >&2
@@ -40,8 +40,11 @@ case "${1:-dev}" in
     ;;
   build) build ;;
   stop)
-    "${runtime[@]}" stop payment-benchmark-api 2>/dev/null || true
+    "${runtime[@]}" stop payment-benchmark-api 2> /dev/null || true
     "${runtime[@]}" stop payment-benchmark-db
     ;;
-  *) echo 'Usage: ./run [dev|test|build|stop]' >&2; exit 2 ;;
+  *)
+    echo 'Usage: ./run [dev|test|build|stop]' >&2
+    exit 2
+    ;;
 esac

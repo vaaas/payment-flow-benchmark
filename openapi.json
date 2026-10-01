@@ -272,35 +272,23 @@
         "type": "string",
         "pattern": "^[1-9][0-9]{0,18}$",
         "description": "Positive canonical decimal string of currency minor units. Maximum 9223372036854775807 (signed bigint); the service enforces this numeric bound.",
-        "examples": [
-          "1999"
-        ]
+        "examples": ["1999"]
       },
       "Currency": {
         "type": "string",
         "pattern": "^[A-Z]{3}$",
         "description": "ISO membership is not validated.",
-        "examples": [
-          "EUR"
-        ]
+        "examples": ["EUR"]
       },
       "PaymentStatus": {
         "type": "string",
-        "enum": [
-          "pending",
-          "failed",
-          "succeeded"
-        ],
+        "enum": ["pending", "failed", "succeeded"],
         "description": "pending may become failed or succeeded; failed may become succeeded. Success is permanent. Repeated statuses are no-ops."
       },
       "CheckoutRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "businessOrderReference",
-          "amountMinor",
-          "currency"
-        ],
+        "required": ["businessOrderReference", "amountMinor", "currency"],
         "properties": {
           "businessOrderReference": {
             "$ref": "#/components/schemas/Identifier"
@@ -316,11 +304,7 @@
       "WebhookRequest": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "eventId",
-          "orderId",
-          "outcome"
-        ],
+        "required": ["eventId", "orderId", "outcome"],
         "properties": {
           "eventId": {
             "$ref": "#/components/schemas/Identifier"
@@ -331,19 +315,14 @@
           },
           "outcome": {
             "type": "string",
-            "enum": [
-              "failed",
-              "succeeded"
-            ]
+            "enum": ["failed", "succeeded"]
           }
         }
       },
       "WebhookResponse": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "duplicate"
-        ],
+        "required": ["duplicate"],
         "properties": {
           "duplicate": {
             "type": "boolean",
@@ -353,9 +332,7 @@
       },
       "Error": {
         "type": "object",
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false,
         "properties": {
           "error": {

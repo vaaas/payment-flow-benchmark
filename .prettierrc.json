@@ -1,0 +1,10 @@
+{
+  "singleQuote": true,
+  "plugins": ["prettier-plugin-sh"],
+  "overrides": [
+    {
+      "files": "run",
+      "options": { "parser": "sh" }
+    }
+  ]
+}
