@@ -1,3 +1,4 @@
+import { Database } from '#src/infrastructure/postgres/database';
 import { installFeatures } from '#src/bootstrap/install-features';
 import { OrderStore } from '#src/features/orders/domain/order-store';
 import { Container } from '#src/application/dependency-injection/container';
@@ -11,7 +12,6 @@ import { migrate } from '#src/infrastructure/postgres/migrate';
 const configuration = Configuration.fromEnv();
 const pool = new Pool({ connectionString: configuration.databaseUrl, max: 20 });
 const container = new Container()
-  .registerInstance(Pool, pool)
   .registerInstance(Configuration, configuration)
   .register(OrderStore, PostgresOrderStore);
 const store = container.get(OrderStore);
@@ -40,6 +40,7 @@ beforeEach(async () => {
   );
 });
 afterAll(async () => {
+  await container.get(Database).close();
   await pool.end();
 });
 test('concurrent checkout retries create exactly one immutable order', async () => {
@@ -350,4 +351,17 @@ test('failed key persistence rolls back order creation and permits identical ret
   expect((await checkout().set('Idempotency-Key', 'failed-key')).status).toBe(
     201,
   );
+});
+
+test('Unicode scalar values including supplementary characters round-trip through PostgreSQL', async () => {
+  const reference = '注文-😀';
+  const response = await checkout({
+    ...payload,
+    businessOrderReference: reference,
+  });
+  expect(response.status).toBe(201);
+  expect((await store.get(response.body.id)).businessOrderReference).toBe(
+    reference,
+  );
+  expect((await webhook(response.body.id, '支払い-😀')).status).toBe(200);
 });

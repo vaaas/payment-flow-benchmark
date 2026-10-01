@@ -1,8 +1,8 @@
 import { readFile, readdir } from 'node:fs/promises';
-import { Pool } from 'pg';
+import { Database } from '#src/infrastructure/postgres/database';
 import { Configuration } from '#src/configuration/configuration';
-export async function migrate(pool: Pool) {
-  const client = await pool.connect();
+export async function migrate(database: Pick<Database, 'connect'>) {
+  const client = await database.connect();
   try {
     await client.query('BEGIN');
     await client.query('SELECT pg_advisory_xact_lock(725831)');
@@ -36,11 +36,11 @@ export async function migrate(pool: Pool) {
 }
 if (require.main === module) {
   const configuration = Configuration.fromEnv();
-  const pool = new Pool({ connectionString: configuration.databaseUrl });
-  migrate(pool)
+  const database = new Database(configuration);
+  migrate(database)
     .catch((error) => {
       console.error(error);
       process.exitCode = 1;
     })
-    .finally(() => pool.end());
+    .finally(() => database.close());
 }

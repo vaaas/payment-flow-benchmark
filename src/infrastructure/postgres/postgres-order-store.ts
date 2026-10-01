@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Database } from '#src/infrastructure/postgres/database';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type { Container } from '#src/application/dependency-injection/container';
 import { randomUUID } from 'node:crypto';
@@ -29,56 +29,62 @@ const toOrder = (row: typeof orders.$inferSelect): Order =>
 
 export class PostgresOrderStore implements OrderStore {
   public static provide(container: Container): PostgresOrderStore {
-    return new PostgresOrderStore(drizzle(container.get(Pool)));
+    return new PostgresOrderStore(container.get(Database));
   }
 
-  constructor(private readonly db: NodePgDatabase) {}
+  constructor(private readonly database: Database) {}
   async create(payload: Checkout, idempotencyKey?: string) {
-    return this.db.transaction(async (tx) => {
-      if (idempotencyKey !== undefined) {
-        await tx.execute(
-          sql`SELECT pg_advisory_xact_lock(hashtextextended(${idempotencyKey}, 1))`,
-        );
-        const [existing] = await tx
-          .select({ order: orders })
-          .from(checkoutIdempotencyKeys)
-          .innerJoin(orders, eq(checkoutIdempotencyKeys.orderId, orders.id))
-          .where(eq(checkoutIdempotencyKeys.key, idempotencyKey));
-        if (existing) return { order: toOrder(existing.order), created: false };
-      }
-      const inserted = await tx
-        .insert(orders)
-        .values({
-          ...payload,
-          publicId: randomUUID(),
-          amountMinor: BigInt(payload.amountMinor),
-        })
-        .onConflictDoNothing({ target: orders.businessOrderReference })
-        .returning();
-      const row =
-        inserted[0] ??
-        (
+    return this.withDatabase((db) =>
+      db.transaction(async (tx) => {
+        if (idempotencyKey !== undefined) {
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(hashtextextended(${idempotencyKey}, 1))`,
+          );
+          const [existing] = await tx
+            .select({ order: orders })
+            .from(checkoutIdempotencyKeys)
+            .innerJoin(orders, eq(checkoutIdempotencyKeys.orderId, orders.id))
+            .where(eq(checkoutIdempotencyKeys.key, idempotencyKey));
+          if (existing)
+            return { order: toOrder(existing.order), created: false };
+        }
+        const inserted = await tx
+          .insert(orders)
+          .values({
+            ...payload,
+            publicId: randomUUID(),
+            amountMinor: BigInt(payload.amountMinor),
+          })
+          .onConflictDoNothing({ target: orders.businessOrderReference })
+          .returning();
+        const row =
+          inserted[0] ??
+          (
+            await tx
+              .select()
+              .from(orders)
+              .where(
+                eq(
+                  orders.businessOrderReference,
+                  payload.businessOrderReference,
+                ),
+              )
+          )[0];
+        if (!row) throw new Error('Checkout order disappeared during creation');
+        const order = toOrder(row);
+        if (!order.matchesCheckout(payload)) throw new CheckoutConflict();
+        if (idempotencyKey !== undefined) {
           await tx
-            .select()
-            .from(orders)
-            .where(
-              eq(orders.businessOrderReference, payload.businessOrderReference),
-            )
-        )[0];
-      if (!row) throw new Error('Checkout order disappeared during creation');
-      const order = toOrder(row);
-      if (!order.matchesCheckout(payload)) throw new CheckoutConflict();
-      if (idempotencyKey !== undefined) {
-        await tx
-          .insert(checkoutIdempotencyKeys)
-          .values({ key: idempotencyKey, orderId: row.id });
-      }
-      return { order, created: inserted.length === 1 };
-    });
+            .insert(checkoutIdempotencyKeys)
+            .values({ key: idempotencyKey, orderId: row.id });
+        }
+        return { order, created: inserted.length === 1 };
+      }),
+    );
   }
   async receive(payload: ProviderEvent) {
-    return this.db
-      .transaction(async (tx) => {
+    return this.withDatabase((db) =>
+      db.transaction(async (tx) => {
         const [order] = await tx
           .select()
           .from(orders)
@@ -111,28 +117,41 @@ export class PostgresOrderStore implements OrderStore {
             .set({ status, updatedAt: new Date() })
             .where(eq(orders.id, order.id));
         return { duplicate: false };
-      })
-      .catch((error: unknown) => {
-        if (typeof error === 'object' && error !== null) {
-          const cause = 'cause' in error ? error.cause : undefined;
-          if (
-            ('code' in error && error.code === '23503') ||
-            (typeof cause === 'object' &&
-              cause !== null &&
-              'code' in cause &&
-              cause.code === '23503')
-          )
-            throw new OrderNotFound();
-        }
-        throw error;
-      });
+      }),
+    ).catch((error: unknown) => {
+      if (typeof error === 'object' && error !== null) {
+        const cause = 'cause' in error ? error.cause : undefined;
+        if (
+          ('code' in error && error.code === '23503') ||
+          (typeof cause === 'object' &&
+            cause !== null &&
+            'code' in cause &&
+            cause.code === '23503')
+        )
+          throw new OrderNotFound();
+      }
+      throw error;
+    });
   }
   async get(id: string) {
-    const [row] = await this.db
-      .select()
-      .from(orders)
-      .where(eq(orders.publicId, id));
-    if (!row) throw new OrderNotFound();
-    return toOrder(row);
+    return this.withDatabase(async (db) => {
+      const [row] = await db
+        .select()
+        .from(orders)
+        .where(eq(orders.publicId, id));
+      if (!row) throw new OrderNotFound();
+      return toOrder(row);
+    });
+  }
+
+  private async withDatabase<T>(
+    operation: (db: NodePgDatabase) => Promise<T>,
+  ): Promise<T> {
+    const client = await this.database.connect();
+    try {
+      return await operation(drizzle(client));
+    } finally {
+      client.release();
+    }
   }
 }
