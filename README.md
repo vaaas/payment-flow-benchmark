@@ -1,6 +1,14 @@
 # Payment flow benchmark
 
-Requires Docker or Podman; no host Node.js or PostgreSQL. Run `./run dev` to build, start PostgreSQL, apply migrations and serve on `http://localhost:3000`. Run `./run test` for compilation and Jest against an isolated `checkout_test` database; `./run stop` stops services and preserves data. Use `CONTAINER_ENGINE=podman` to select a runtime. Dev watches files inside the container; restart `./run dev` after host edits to rebuild. Database credentials are local benchmark defaults.
+Requires Docker with Compose, or Podman with a Compose provider; no host Node.js or PostgreSQL. All tooling runs in containers.
+
+- `./run dev`: build, start PostgreSQL, apply migrations, and serve at `http://localhost:3000`. Source files are mounted for live reload; restart after dependency or configuration changes.
+- `./run test`: compile and run Jest against a separate PostgreSQL service with database `checkout_test`.
+- `./run format` / `./run format:check`: apply or check Prettier formatting, including the shell helper.
+- `./run build`: build the application image.
+- `./run stop`: remove service containers and networks, preserving development database data.
+
+[compose.yaml](compose.yaml) defines services, database health checks, ports, and volumes. Test and tooling services use separate profiles. Use `CONTAINER_ENGINE=podman` to select Podman. You can also use Compose directly, for example `docker compose up --build api`. Credentials are local benchmark defaults. Concurrent test runs share the test database and must be serialized.
 
 ## API
 
