@@ -1,12 +1,12 @@
 import express, { Express } from 'express';
-import type { CommandBus } from '../application/command-bus';
-import type { QueryBus } from '../application/query-bus';
-import { CreateCheckoutRoute } from '../checkout/http/create-checkout-route';
-import { GetOrderRoute } from '../orders/http/get-order-route';
-import { ReceiveWebhookRoute } from '../payments/http/receive-webhook-route';
-import { ErrorHandler } from './error-handler';
-import { NotFoundRoute } from './not-found-route';
-import { OpenApiRoute } from './openapi-route';
+import type { CommandBus } from '#src/application/command-bus';
+import type { QueryBus } from '#src/application/query-bus';
+import { CreateCheckoutRoute } from '#src/checkout/http/create-checkout-route';
+import { GetOrderRoute } from '#src/orders/http/get-order-route';
+import { ReceiveWebhookRoute } from '#src/payments/http/receive-webhook-route';
+import { ErrorHandler } from '#src/http/error-handler';
+import { NotFoundRoute } from '#src/http/not-found-route';
+import { OpenApiRoute } from '#src/http/openapi-route';
 
 export class App {
   public readonly http: Express;

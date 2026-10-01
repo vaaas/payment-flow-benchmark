@@ -1,7 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 import { z } from 'zod';
-import type { QueryBus } from '../../application/query-bus';
-import { GetOrder } from '../domain/get-order';
+import type { QueryBus } from '#src/application/query-bus';
+import { GetOrder } from '#src/orders/domain/get-order';
 
 export class GetOrderRoute {
   private readonly parametersSchema = z.object({ id: z.uuid() });

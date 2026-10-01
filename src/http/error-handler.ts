@@ -1,8 +1,8 @@
 import type { ErrorRequestHandler } from 'express';
 import { z } from 'zod';
-import { CheckoutConflict } from '../checkout/domain/checkout-conflict';
-import { OrderNotFound } from '../orders/domain/order-not-found';
-import { ProviderEventConflict } from '../payments/domain/provider-event-conflict';
+import { CheckoutConflict } from '#src/checkout/domain/checkout-conflict';
+import { OrderNotFound } from '#src/orders/domain/order-not-found';
+import { ProviderEventConflict } from '#src/payments/domain/provider-event-conflict';
 
 export class ErrorHandler {
   public readonly handle: ErrorRequestHandler = (

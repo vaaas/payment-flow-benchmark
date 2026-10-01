@@ -1,13 +1,13 @@
 import request from 'supertest';
-import { App } from '../../src/http/app';
-import { CommandBus } from '../../src/application/command-bus';
-import { QueryBus } from '../../src/application/query-bus';
-import type { OrderStore } from '../../src/orders/domain/order-store';
-import { OrderNotFound } from '../../src/orders/domain/order-not-found';
-import { Order } from '../../src/orders/domain/order';
-import { CreateCheckout } from '../../src/checkout/domain/create-checkout';
-import { ReceiveWebhook } from '../../src/payments/domain/receive-webhook';
-import { GetOrder } from '../../src/orders/domain/get-order';
+import { App } from '#src/http/app';
+import { CommandBus } from '#src/application/command-bus';
+import { QueryBus } from '#src/application/query-bus';
+import type { OrderStore } from '#src/orders/domain/order-store';
+import { OrderNotFound } from '#src/orders/domain/order-not-found';
+import { Order } from '#src/orders/domain/order';
+import { CreateCheckout } from '#src/checkout/domain/create-checkout';
+import { ReceiveWebhook } from '#src/payments/domain/receive-webhook';
+import { GetOrder } from '#src/orders/domain/get-order';
 const store: jest.Mocked<OrderStore> = {
   create: jest.fn(),
   receive: jest.fn(),

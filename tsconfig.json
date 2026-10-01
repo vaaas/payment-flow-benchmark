@@ -7,7 +7,11 @@
     "esModuleInterop": true,
     "outDir": "dist",
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "paths": {
+      "#src/*": ["./src/*"],
+      "#openapi": ["./openapi.json"]
+    }
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

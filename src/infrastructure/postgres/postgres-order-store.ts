@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { Checkout } from '../../checkout/domain/create-checkout';
-import { CheckoutConflict } from '../../checkout/domain/checkout-conflict';
-import { Order } from '../../orders/domain/order';
-import { OrderNotFound } from '../../orders/domain/order-not-found';
-import type { OrderStore } from '../../orders/domain/order-store';
-import type { ProviderEvent } from '../../payments/domain/receive-webhook';
-import { ProviderEventConflict } from '../../payments/domain/provider-event-conflict';
-import { orders, providerEvents } from './schema';
+import type { Checkout } from '#src/checkout/domain/create-checkout';
+import { CheckoutConflict } from '#src/checkout/domain/checkout-conflict';
+import { Order } from '#src/orders/domain/order';
+import { OrderNotFound } from '#src/orders/domain/order-not-found';
+import type { OrderStore } from '#src/orders/domain/order-store';
+import type { ProviderEvent } from '#src/payments/domain/receive-webhook';
+import { ProviderEventConflict } from '#src/payments/domain/provider-event-conflict';
+import { orders, providerEvents } from '#src/infrastructure/postgres/schema';
 const toOrder = (row: typeof orders.$inferSelect): Order =>
   new Order({
     ...row,

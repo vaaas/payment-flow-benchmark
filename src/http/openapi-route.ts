@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import openApiSpec from '../../openapi.json';
+import openApiSpec from '#openapi';
 
 export class OpenApiRoute {
   public readonly handle: RequestHandler = (_request, response) => {

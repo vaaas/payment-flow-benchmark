@@ -1,6 +1,6 @@
-import { CreateCheckout } from '../checkout/domain/create-checkout';
-import { ReceiveWebhook } from '../payments/domain/receive-webhook';
-import type { OrderStore } from '../orders/domain/order-store';
+import { CreateCheckout } from '#src/checkout/domain/create-checkout';
+import { ReceiveWebhook } from '#src/payments/domain/receive-webhook';
+import type { OrderStore } from '#src/orders/domain/order-store';
 
 export class CommandBus {
   constructor(private readonly store: OrderStore) {}

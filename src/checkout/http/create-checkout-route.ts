@@ -1,8 +1,8 @@
 import type { Request, RequestHandler } from 'express';
 import { z } from 'zod';
-import type { CommandBus } from '../../application/command-bus';
-import { requestIdentifier } from '../../http/request-identifier';
-import { CreateCheckout } from '../domain/create-checkout';
+import type { CommandBus } from '#src/application/command-bus';
+import { requestIdentifier } from '#src/http/request-identifier';
+import { CreateCheckout } from '#src/checkout/domain/create-checkout';
 
 export class CreateCheckoutRoute {
   private readonly bodySchema = z.strictObject({
