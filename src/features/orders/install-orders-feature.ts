@@ -1,3 +1,4 @@
+import { RateLimiter } from '#src/http/rate-limiting/rate-limiter';
 import { BearerAuthentication } from '#src/http/authentication/bearer-authentication';
 import type { App } from '#src/http/app';
 import { Bus } from '#src/application/bus';
@@ -13,6 +14,7 @@ export function installOrdersFeature(app: App): App {
   app.routes.get(
     '/orders/:id',
     container.get(BearerAuthentication).handle,
+    container.get(RateLimiter).handle,
     container.get(GetOrderRoute).handle,
   );
   return app;

@@ -113,6 +113,28 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Shared authenticated private-route rate limit exceeded. Default: 100 requests per 60 seconds per process.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Too many requests; retry later"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -292,6 +314,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Shared authenticated private-route rate limit exceeded. Default: 100 requests per 60 seconds per process.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the current window resets.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "Too many requests; retry later"
                 }
               }
             }
