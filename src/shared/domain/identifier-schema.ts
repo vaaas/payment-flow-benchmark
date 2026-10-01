@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const requestIdentifier = z
+export const identifierSchema = z
   .string()
   .min(1)
   .max(128)
