@@ -85,7 +85,7 @@
             }
           },
           "503": {
-            "description": "Processing failed. Retry the identical request; commit may have succeeded if acknowledgement was lost.",
+            "description": "Database unavailable or unexpected processing failure. If no database connection can be acquired, the error is Cannot connect to the database; retry later. Retry with the same submission key or provider event ID.",
             "content": {
               "application/json": {
                 "schema": {
@@ -96,6 +96,16 @@
           },
           "401": {
             "description": "Missing, malformed, or incorrect bearer API key. Includes WWW-Authenticate: Bearer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON charset or content encoding.",
             "content": {
               "application/json": {
                 "schema": {
@@ -198,7 +208,17 @@
             }
           },
           "503": {
-            "description": "Processing failed. Retry the identical request; commit may have succeeded if acknowledgement was lost.",
+            "description": "Database unavailable or unexpected processing failure. If no database connection can be acquired, the error is Cannot connect to the database; retry later. Retry with the same submission key or provider event ID.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Unsupported JSON charset or content encoding.",
             "content": {
               "application/json": {
                 "schema": {
@@ -257,7 +277,7 @@
             }
           },
           "503": {
-            "description": "Processing failed. Retry the identical request; commit may have succeeded if acknowledgement was lost.",
+            "description": "Database unavailable or unexpected processing failure. If no database connection can be acquired, the error is Cannot connect to the database; retry later. Retry with the same submission key or provider event ID.",
             "content": {
               "application/json": {
                 "schema": {
