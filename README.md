@@ -19,11 +19,13 @@ Environment variables are read only by the immutable `Configuration` class via `
 
 ## API
 
+Checkout submissions optionally accept `Idempotency-Key` (1–128 characters, no leading/trailing whitespace). Keys are globally unique for checkout in this single-identity sample. The first committed valid request wins; an identical or changed valid submission with the same key returns that order’s current state with 200 without writing. Validation and authentication still run on retries. The key-to-order link and checkout are committed together; transaction failure releases the key for retry. A PostgreSQL advisory transaction lock serializes requests for the same key, with a unique key constraint as a backstop. Without a key, business-reference retry/conflict rules apply. Different keys can point to the same matching business reference. Keys have no expiry or cleanup. Webhooks already use their provider event IDs for idempotency.
+
 Checkout creation and order lookup require `Authorization: Bearer benchmark-api-key`. Set `API_KEY` to override the sample shared key. Missing or invalid credentials return 401 with `WWW-Authenticate: Bearer`. Webhooks and OpenAPI remain public. This sample has one shared identity; it does not implement merchant authorization, key rotation, or rate limiting.
 
 The [OpenAPI 3.1 spec](openapi.json) is served at `GET /openapi.json`, with schemas, examples, validation rules, and retry/conflict behavior. Import it into an OpenAPI client or editor.
 
-- `POST /checkout-intents`: `{"businessOrderReference":"merchant-123","amountMinor":"1999","currency":"EUR"}`. Returns 201 for creation, 200 for matching retries, with `{id,businessOrderReference,amountMinor,currency,status,createdAt,updatedAt}`. Timestamps are UTC ISO strings. Changed amount/currency returns 409.
+- `POST /checkout-intents`: `{"businessOrderReference":"merchant-123","amountMinor":"1999","currency":"EUR"}`. Returns 201 for creation, 200 for matching retries, with `{id,businessOrderReference,amountMinor,currency,status,createdAt,updatedAt}`. Timestamps are UTC ISO strings. Changed amount/currency returns 409 unless an already committed `Idempotency-Key` selects the first request’s order.
 - `POST /webhooks/payment`: `{"eventId":"evt-1","orderId":"<returned UUID>","outcome":"succeeded"}`. Outcome is `failed` or `succeeded`. Returns 200 with `{"duplicate":false}` after commit, or `{"duplicate":true}` for an identical committed event. Changed event payload returns 409; unknown order returns 404 without consuming the event ID. An unknown order is checked first, so it returns 404 even for a reused event ID.
 - `GET /orders/:id`: returns the order, or 404. Malformed requests return 400; unexpected processing failures return 503. JSON objects reject unknown fields. Bodies are limited to 16 KiB.
 

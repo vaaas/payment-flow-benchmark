@@ -45,7 +45,7 @@
             }
           },
           "200": {
-            "description": "Existing matching order, including its current payment status.",
+            "description": "Existing matching business-reference order, or the order selected by the first committed request for the supplied idempotency key. Returns current order status.",
             "content": {
               "application/json": {
                 "schema": {
@@ -108,6 +108,20 @@
         "security": [
           {
             "BearerApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Optional globally unique checkout submission key. The first committed valid request wins; subsequent valid requests return its order with 200, even if their payload differs. Failed transactions do not consume the key.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^\\S(?:.*\\S)?$"
+            }
           }
         ]
       }
