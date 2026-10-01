@@ -1,5 +1,5 @@
 import { pgTable, uuid, text, bigint, timestamp } from 'drizzle-orm/pg-core';
-import { PaymentStatus } from './domain';
+import type { PaymentStatus } from '../../orders/domain/order';
 export const orders = pgTable('orders', {
   id: uuid('id').primaryKey(),
   businessOrderReference: text('business_order_reference').notNull().unique(),

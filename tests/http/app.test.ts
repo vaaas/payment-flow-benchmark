@@ -1,13 +1,19 @@
 import request from 'supertest';
-import { createApp } from '../src/app';
-import { CommandBus, HttpError, OrderStore, QueryBus } from '../src/domain';
+import { App } from '../../src/http/app';
+import { CommandBus } from '../../src/application/command-bus';
+import { QueryBus } from '../../src/application/query-bus';
+import type { OrderStore } from '../../src/orders/domain/order-store';
+import { OrderNotFound } from '../../src/orders/domain/order-not-found';
 const store: jest.Mocked<OrderStore> = {
   create: jest.fn(),
   receive: jest.fn(),
   get: jest.fn(),
 };
-const app = createApp(new CommandBus(store), new QueryBus(store));
+const commands = new CommandBus(store);
+const queries = new QueryBus(store);
+const app = new App(commands, queries).http;
 beforeEach(() => jest.resetAllMocks());
+afterEach(() => jest.restoreAllMocks());
 test('invalid JSON and unknown fields never reach persistence', async () => {
   expect(
     (
@@ -30,7 +36,7 @@ test('invalid JSON and unknown fields never reach persistence', async () => {
   expect(store.create).not.toHaveBeenCalled();
 });
 test('unknown order and malformed UUID produce distinct responses', async () => {
-  store.get.mockRejectedValue(new HttpError(404, 'Order not found'));
+  store.get.mockRejectedValue(new OrderNotFound());
   expect(
     (await request(app).get('/orders/11111111-1111-4111-8111-111111111111'))
       .status,
@@ -57,3 +63,4 @@ test('webhook acknowledgement waits for persistence completion', async () => {
   complete({ duplicate: false });
   expect((await response).status).toBe(200);
 });
+

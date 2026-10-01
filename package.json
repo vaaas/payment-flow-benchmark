@@ -6,7 +6,7 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc",
     "start": "node dist/src/main.js",
-    "migrate": "tsx src/migrate.ts",
+    "migrate": "tsx src/infrastructure/postgres/migrate.ts",
     "test": "jest --runInBand",
     "format": "prettier --write . run",
     "format:check": "prettier --check . run"

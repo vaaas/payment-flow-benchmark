@@ -1,19 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import {
-  Checkout,
-  HttpError,
-  nextStatus,
-  Order,
-  OrderStore,
-  ProviderEvent,
-} from './domain';
+import type { Checkout } from '../../checkout/domain/create-checkout';
+import { CheckoutConflict } from '../../checkout/domain/checkout-conflict';
+import { Order } from '../../orders/domain/order';
+import { OrderNotFound } from '../../orders/domain/order-not-found';
+import type { OrderStore } from '../../orders/domain/order-store';
+import type { ProviderEvent } from '../../payments/domain/receive-webhook';
+import { ProviderEventConflict } from '../../payments/domain/provider-event-conflict';
 import { orders, providerEvents } from './schema';
-const toOrder = (row: typeof orders.$inferSelect): Order => ({
-  ...row,
-  amountMinor: row.amountMinor.toString(),
-});
+const toOrder = (row: typeof orders.$inferSelect): Order =>
+  new Order({
+    ...row,
+    amountMinor: row.amountMinor.toString(),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  });
+
 export class PostgresOrderStore implements OrderStore {
   constructor(private readonly db: NodePgDatabase) {}
   async create(payload: Checkout) {
@@ -37,15 +40,9 @@ export class PostgresOrderStore implements OrderStore {
               eq(orders.businessOrderReference, payload.businessOrderReference),
             )
         )[0];
-      if (
-        row.amountMinor.toString() !== payload.amountMinor ||
-        row.currency !== payload.currency
-      )
-        throw new HttpError(
-          409,
-          'Business order reference already has a different checkout payload',
-        );
-      return { order: toOrder(row), created: inserted.length === 1 };
+      const order = toOrder(row);
+      if (!order.matchesCheckout(payload)) throw new CheckoutConflict();
+      return { order, created: inserted.length === 1 };
     });
   }
   async receive(payload: ProviderEvent) {
@@ -56,7 +53,7 @@ export class PostgresOrderStore implements OrderStore {
           .from(orders)
           .where(eq(orders.id, payload.orderId))
           .for('update');
-        if (!order) throw new HttpError(404, 'Order not found');
+        if (!order) throw new OrderNotFound();
         const inserted = await tx
           .insert(providerEvents)
           .values(payload)
@@ -71,13 +68,10 @@ export class PostgresOrderStore implements OrderStore {
             existing.orderId !== payload.orderId ||
             existing.outcome !== payload.outcome
           )
-            throw new HttpError(
-              409,
-              'Provider event ID already has a different payload',
-            );
+            throw new ProviderEventConflict();
           return { duplicate: true };
         }
-        const status = nextStatus(order.status, payload.outcome);
+        const status = toOrder(order).paymentStatusAfter(payload.outcome);
         if (status !== order.status)
           await tx
             .update(orders)
@@ -87,13 +81,13 @@ export class PostgresOrderStore implements OrderStore {
       })
       .catch((error) => {
         if (error.code === '23503' || error.cause?.code === '23503')
-          throw new HttpError(404, 'Order not found');
+          throw new OrderNotFound();
         throw error;
       });
   }
   async get(id: string) {
     const [row] = await this.db.select().from(orders).where(eq(orders.id, id));
-    if (!row) throw new HttpError(404, 'Order not found');
+    if (!row) throw new OrderNotFound();
     return toOrder(row);
   }
 }
