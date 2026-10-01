@@ -11,6 +11,8 @@ Requires Docker with Compose, or Podman with a Compose provider; no host Node.js
 
 [compose.yaml](compose.yaml) defines services, database health checks, ports, and volumes. Test and tooling services use separate profiles. Use `CONTAINER_ENGINE=podman` to select Podman, or `API_PORT=3001` to change the local API port. You can also use Compose directly, for example `docker compose up --build api`. Container-installed dependencies are bind-mounted at `./node_modules` for local editors; dependency installation runs before dev and npm/tooling commands. npm commands run against the mounted workspace, so package and lockfile changes persist. `./run test` supplies its own database; `./run npm test` does not. Credentials are local benchmark defaults. Concurrent test runs share the test database and must be serialized.
 
+Project imports use `#src/...` and `#openapi`; relative imports are forbidden by ESLint. Run `./run npm run lint` explicitly; builds and tests also enforce it. Aliases resolve in tsx, Jest, and compiled Node.js.
+
 ## API
 
 The [OpenAPI 3.1 spec](openapi.json) is served at `GET /openapi.json`, with schemas, examples, validation rules, and retry/conflict behavior. Import it into an OpenAPI client or editor.
