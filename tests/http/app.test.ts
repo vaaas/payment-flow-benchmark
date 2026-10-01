@@ -1,3 +1,7 @@
+import type {
+  ErrorResponse,
+  IRespondable,
+} from '#src/shared/response/i-respondable';
 import request from 'supertest';
 import { App } from '#src/http/app';
 import { CommandBus } from '#src/application/command-bus';
@@ -156,3 +160,38 @@ test('App serves its OpenAPI route and handles unmatched routes', async () => {
     error: 'Route not found',
   });
 });
+
+test('middleware accepts an unknown error implementing IRespondable', async () => {
+  class RateLimited extends Error implements IRespondable {
+    response(): ErrorResponse {
+      return {
+        status: 429,
+        body: { error: 'Try again later', details: { retryAfter: 5 } },
+      };
+    }
+  }
+  store.get.mockRejectedValue(new RateLimited());
+  const response = await request(app).get(`/orders/${order.id}`);
+  expect(response.status).toBe(429);
+  expect(response.body).toEqual({
+    error: 'Try again later',
+    details: { retryAfter: 5 },
+  });
+});
+
+test.each([
+  new Error('private database failure'),
+  { response: 'not a method' },
+])(
+  'middleware handles non-respondable errors without leaking details: %s',
+  async (error) => {
+    store.get.mockRejectedValue(error);
+    const log = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const response = await request(app).get(`/orders/${order.id}`);
+    expect(response.status).toBe(503);
+    expect(response.body).toEqual({
+      error: 'Processing failed; retry the identical request',
+    });
+    expect(log).toHaveBeenCalledWith(error);
+  },
+);
