@@ -1,5 +1,6 @@
 import express, { ErrorRequestHandler } from 'express';
 import { z } from 'zod';
+import openApiSpec from '../openapi.json';
 import { CommandBus, CreateCheckout, GetOrder, HttpError, QueryBus, ReceiveWebhook } from './domain';
 const identifier = z.string().min(1).max(128).refine(value => value.trim() === value);
 const checkoutSchema = z.strictObject({
@@ -11,6 +12,7 @@ const eventSchema = z.strictObject({ eventId: identifier, orderId: z.uuid(), out
 export function createApp(commands: CommandBus, queries: QueryBus) {
   const app = express();
   app.use(express.json({ limit: '16kb' }));
+  app.get('/openapi.json', (_req, res) => { res.json(openApiSpec); });
   app.post('/checkout-intents', async (req, res) => {
     const result = await commands.dispatch(new CreateCheckout(checkoutSchema.parse(req.body)));
     res.status(result.created ? 201 : 200).json(result.order);

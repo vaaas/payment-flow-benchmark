@@ -1,0 +1,416 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Payment flow benchmark",
+    "version": "1.0.0",
+    "description": "Single-merchant checkout backend. JSON bodies are limited to 16 KiB. Webhooks come from a simulated provider."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development"
+    }
+  ],
+  "security": [],
+  "paths": {
+    "/checkout-intents": {
+      "post": {
+        "operationId": "createCheckoutIntent",
+        "summary": "Create or retrieve a checkout intent",
+        "description": "References are globally unique in this single-merchant service. Matching retries return the existing order; changed amount or currency is rejected without mutation.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              },
+              "example": {
+                "businessOrderReference": "merchant-123",
+                "amountMinor": "1999",
+                "currency": "EUR"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "New pending order committed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Existing matching order, including its current payment status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Reference already has a different checkout payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request fields or malformed JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 16 KiB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Processing failed. Retry the identical request; commit may have succeeded if acknowledgement was lost.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/webhooks/payment": {
+      "post": {
+        "operationId": "receivePaymentWebhook",
+        "summary": "Apply a simulated provider event",
+        "description": "No authentication or signature is required. Event IDs are globally unique for one provider. Event receipt and status update commit together before acknowledgement. Success takes precedence regardless of arrival order; failures after success are recorded without changing status. Reused IDs with different order or outcome are rejected.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhookRequest"
+              },
+              "example": {
+                "eventId": "evt-1",
+                "orderId": "11111111-1111-4111-8111-111111111111",
+                "outcome": "succeeded"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event committed or identical committed event acknowledged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order does not exist; event ID is not consumed. Retry after checkout exists. Order existence is checked before event ID conflicts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Event ID already has a different payload; changed payload is never applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request fields or malformed JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 16 KiB.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Processing failed. Retry the identical request; commit may have succeeded if acknowledgement was lost.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{id}": {
+      "get": {
+        "operationId": "getOrder",
+        "summary": "Get current order status",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Order"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request fields or malformed JSON.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order does not exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Processing failed. Retry the identical request; commit may have succeeded if acknowledgement was lost.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "operationId": "getOpenApiSpec",
+        "summary": "Get this OpenAPI document",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Identifier": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+        "description": "Case-sensitive; no leading or trailing whitespace."
+      },
+      "AmountMinor": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]{0,18}$",
+        "description": "Positive canonical decimal string of currency minor units. Maximum 9223372036854775807 (signed bigint); the service enforces this numeric bound.",
+        "examples": [
+          "1999"
+        ]
+      },
+      "Currency": {
+        "type": "string",
+        "pattern": "^[A-Z]{3}$",
+        "description": "ISO membership is not validated.",
+        "examples": [
+          "EUR"
+        ]
+      },
+      "PaymentStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "failed",
+          "succeeded"
+        ],
+        "description": "pending may become failed or succeeded; failed may become succeeded. Success is permanent. Repeated statuses are no-ops."
+      },
+      "CheckoutRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "businessOrderReference",
+          "amountMinor",
+          "currency"
+        ],
+        "properties": {
+          "businessOrderReference": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "amountMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          }
+        }
+      },
+      "WebhookRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "eventId",
+          "orderId",
+          "outcome"
+        ],
+        "properties": {
+          "eventId": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "orderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "failed",
+              "succeeded"
+            ]
+          }
+        }
+      },
+      "WebhookResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "duplicate"
+        ],
+        "properties": {
+          "duplicate": {
+            "type": "boolean",
+            "description": "True for an identical previously committed event."
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "details": {
+            "type": "array",
+            "description": "Optional schema validation issues; fields depend on the validator.",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "businessOrderReference",
+          "amountMinor",
+          "currency",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessOrderReference": {
+            "$ref": "#/components/schemas/Identifier"
+          },
+          "amountMinor": {
+            "$ref": "#/components/schemas/AmountMinor"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Changes on order changes, not retries or ignored events."
+          }
+        }
+      }
+    }
+  }
+}

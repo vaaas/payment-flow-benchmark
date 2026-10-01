@@ -4,6 +4,8 @@ Requires Docker or Podman; no host Node.js or PostgreSQL. Run `./run dev` to bui
 
 ## API
 
+The [OpenAPI 3.1 spec](openapi.json) is served at `GET /openapi.json`, with schemas, examples, validation rules, and retry/conflict behavior. Import it into an OpenAPI client or editor.
+
 - `POST /checkout-intents`: `{"businessOrderReference":"merchant-123","amountMinor":"1999","currency":"EUR"}`. Returns 201 for creation, 200 for matching retries, with `{id,businessOrderReference,amountMinor,currency,status,createdAt,updatedAt}`. Timestamps are UTC ISO strings. Changed amount/currency returns 409.
 - `POST /webhooks/payment`: `{"eventId":"evt-1","orderId":"<returned UUID>","outcome":"succeeded"}`. Outcome is `failed` or `succeeded`. Returns 200 with `{"duplicate":false}` after commit, or `{"duplicate":true}` for an identical committed event. Changed event payload returns 409; unknown order returns 404 without consuming the event ID. An unknown order is checked first, so it returns 404 even for a reused event ID.
 - `GET /orders/:id`: returns the order, or 404. Malformed requests return 400; unexpected processing failures return 503. JSON objects reject unknown fields. Bodies are limited to 16 KiB.
