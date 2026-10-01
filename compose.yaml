@@ -33,6 +33,8 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:benchmark@database:5432/checkout
       API_KEY: ${API_KEY:-benchmark-api-key}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
     ports:
       - 127.0.0.1:${API_PORT:-3000}:3000
     volumes:
@@ -62,6 +64,7 @@ services:
     command: [npm, test]
     environment:
       DATABASE_URL: postgresql://postgres:benchmark@test-database:5432/checkout_test
+      RATE_LIMIT_MAX: 10000
     depends_on:
       test-database:
         condition: service_healthy
