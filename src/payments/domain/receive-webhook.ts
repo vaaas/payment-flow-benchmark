@@ -1,3 +1,5 @@
+import { Event } from '#src/application/event';
+import type { OrderStore } from '#src/orders/domain/order-store';
 import { z } from 'zod';
 import { identifierSchema } from '#src/shared/domain/identifier-schema';
 
@@ -9,7 +11,9 @@ export type ProviderEvent = Readonly<{
   outcome: PaymentOutcome;
 }>;
 
-export class ReceiveWebhook {
+export class ReceiveWebhook extends Event<
+  Awaited<ReturnType<OrderStore['receive']>>
+> {
   private static readonly schema = z.strictObject({
     eventId: identifierSchema,
     orderId: z.uuid(),
@@ -23,6 +27,7 @@ export class ReceiveWebhook {
   public readonly payload: ProviderEvent;
 
   private constructor(payload: ProviderEvent) {
+    super();
     this.payload = Object.freeze({ ...payload });
     Object.freeze(this);
   }

@@ -4,8 +4,10 @@ import type {
 } from '#src/shared/response/i-respondable';
 import request from 'supertest';
 import { App } from '#src/http/app';
-import { CommandBus } from '#src/application/command-bus';
-import { QueryBus } from '#src/application/query-bus';
+import { Bus } from '#src/application/bus';
+import { CreateCheckoutHandler } from '#src/checkout/application/create-checkout-handler';
+import { ReceiveWebhookHandler } from '#src/payments/application/receive-webhook-handler';
+import { GetOrderHandler } from '#src/orders/application/get-order-handler';
 import type { OrderStore } from '#src/orders/domain/order-store';
 import { OrderNotFound } from '#src/orders/domain/order-not-found';
 import { Order } from '#src/orders/domain/order';
@@ -17,9 +19,11 @@ const store: jest.Mocked<OrderStore> = {
   receive: jest.fn(),
   get: jest.fn(),
 };
-const commands = new CommandBus(store);
-const queries = new QueryBus(store);
-const app = new App(commands, queries).http;
+const bus = new Bus()
+  .on(CreateCheckout, new CreateCheckoutHandler(store))
+  .on(ReceiveWebhook, new ReceiveWebhookHandler(store))
+  .on(GetOrder, new GetOrderHandler(store));
+const app = new App(bus).http;
 beforeEach(() => jest.resetAllMocks());
 afterEach(() => jest.restoreAllMocks());
 test('invalid JSON and unknown fields never reach persistence', async () => {
@@ -87,7 +91,7 @@ const order = new Order({
 
 test('checkout route dispatches a parsed immutable domain command', async () => {
   store.create.mockResolvedValue({ order, created: true });
-  const dispatch = jest.spyOn(commands, 'dispatch');
+  const dispatch = jest.spyOn(bus, 'dispatch');
   const response = await request(app)
     .post('/checkout-intents')
     .send(checkoutPayload);
@@ -96,6 +100,8 @@ test('checkout route dispatches a parsed immutable domain command', async () => 
   expect(response.body).toEqual({ ...order });
   expect(dispatch).toHaveBeenCalledWith(expect.any(CreateCheckout));
   const command = dispatch.mock.calls[0][0];
+  if (!(command instanceof CreateCheckout))
+    throw new Error('Expected CreateCheckout');
   expect(command.payload).toEqual(checkoutPayload);
   expect(Object.isFrozen(command)).toBe(true);
   expect(Object.isFrozen(command.payload)).toBe(true);
@@ -104,13 +110,15 @@ test('checkout route dispatches a parsed immutable domain command', async () => 
 test('webhook route dispatches a parsed immutable domain command', async () => {
   const payload = { eventId: 'event-1', orderId: order.id, outcome: 'failed' };
   store.receive.mockResolvedValue({ duplicate: false });
-  const dispatch = jest.spyOn(commands, 'dispatch');
+  const dispatch = jest.spyOn(bus, 'dispatch');
   const response = await request(app).post('/webhooks/payment').send(payload);
 
   expect(response.status).toBe(200);
   expect(response.body).toEqual({ duplicate: false });
   expect(dispatch).toHaveBeenCalledWith(expect.any(ReceiveWebhook));
   const command = dispatch.mock.calls[0][0];
+  if (!(command instanceof ReceiveWebhook))
+    throw new Error('Expected ReceiveWebhook');
   expect(command.payload).toEqual(payload);
   expect(Object.isFrozen(command)).toBe(true);
   expect(Object.isFrozen(command.payload)).toBe(true);
@@ -118,13 +126,15 @@ test('webhook route dispatches a parsed immutable domain command', async () => {
 
 test('order route dispatches a parsed immutable domain query', async () => {
   store.get.mockResolvedValue(order);
-  const dispatch = jest.spyOn(queries, 'dispatch');
+  const dispatch = jest.spyOn(bus, 'dispatch');
   const response = await request(app).get(`/orders/${order.id}`);
 
   expect(response.status).toBe(200);
   expect(response.body).toEqual({ ...order });
   expect(dispatch).toHaveBeenCalledWith(expect.any(GetOrder));
-  expect(dispatch.mock.calls[0][0].id).toBe(order.id);
+  const query = dispatch.mock.calls[0][0];
+  if (!(query instanceof GetOrder)) throw new Error('Expected GetOrder');
+  expect(query.id).toBe(order.id);
   expect(Object.isFrozen(dispatch.mock.calls[0][0])).toBe(true);
 });
 
