@@ -100,3 +100,19 @@ test('circular dependencies report the resolution path and clear pending resolut
     );
   }
 });
+
+test('nested installers register dependencies lazily and preserve container identity', () => {
+  const provide = jest.fn(() => new Dependency());
+  const installDependency = (container: Container): Container =>
+    container.register(Dependency, { provide });
+  const installFeature = (container: Container): Container =>
+    container.install(installDependency).register(Consumer, Consumer);
+  const container = new Container();
+  expect(container.install(installFeature)).toBe(container);
+  expect(provide).not.toHaveBeenCalled();
+  expect(container.get(Consumer).dependency).toBe(container.get(Dependency));
+  expect(provide).toHaveBeenCalledTimes(1);
+  expect(() => container.install(installDependency)).toThrow(
+    'Dependency already registered for Dependency',
+  );
+});

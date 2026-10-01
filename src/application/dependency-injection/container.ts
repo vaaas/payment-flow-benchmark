@@ -1,8 +1,13 @@
+import type { Installer } from '#src/application/installer';
 import type { IAutowire } from '#src/application/dependency-injection/i-autowire';
 
 export type Class<T extends object> = Function & { readonly prototype: T };
 
 export class Container {
+  public install(installer: Installer<Container>): Container {
+    return installer(this);
+  }
+
   private readonly providers = new Map<Function, IAutowire>();
   private readonly instances = new Map<Function, object>();
   private readonly resolving = new Set<Function>();

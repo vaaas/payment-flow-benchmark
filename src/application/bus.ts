@@ -1,7 +1,12 @@
+import type { Installer } from '#src/application/installer';
 import type { Event, EventType } from '#src/application/event';
 import type { EventHandler } from '#src/application/event-handler';
 
 export class Bus {
+  public install(installer: Installer<Bus>): Bus {
+    return installer(this);
+  }
+
   private readonly handlers = new Map<
     Function,
     (event: Event<unknown>) => Promise<unknown>

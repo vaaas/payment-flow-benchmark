@@ -59,3 +59,21 @@ test('synchronous handler failures also become rejected dispatch promises', asyn
   });
   await expect(bus.dispatch(new ReadCount())).rejects.toBe(failure);
 });
+
+test('nested feature installers batch event registrations and preserve chaining', async () => {
+  const installReads = (bus: Bus): Bus =>
+    bus
+      .on(ReadName, { handle: async (event) => `order-${event.id}` })
+      .on(ReadCount, { handle: async () => 4 });
+  const installFeature = (bus: Bus): Bus =>
+    bus.install(installReads).on(Notify, { handle: async () => {} });
+  const bus = new Bus();
+  expect(bus.install(installFeature)).toBe(bus);
+  expect(await bus.dispatch(new ReadName(2))).toBe('order-2');
+  expect(await bus.dispatch(new ReadCount())).toBe(4);
+  await expect(bus.dispatch(new Notify())).resolves.toBeUndefined();
+  expect(() => bus.install(installReads)).toThrow(
+    'Handler already registered for ReadName',
+  );
+  expect(await bus.dispatch(new ReadCount())).toBe(4);
+});
