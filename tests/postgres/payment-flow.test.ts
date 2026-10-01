@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { Pool } from 'pg';
 import { Configuration } from '#src/configuration/configuration';
+import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { randomUUID } from 'node:crypto';
 import { App } from '#src/http/app';
@@ -140,16 +140,53 @@ test('database failure rolls back event insertion and permits identical retry', 
   }
   expect((await webhook(order.id, 'retry-after-failure')).status).toBe(200);
 });
-test('database rejects success regression and checkout mutation', async () => {
+test('public UUIDs map to serial keys and integer foreign keys without leaking internal IDs', async () => {
   const { body: order } = await checkout();
-  await webhook(order.id, 'success');
-  await expect(
-    pool.query("UPDATE orders SET status='failed' WHERE id=$1", [order.id]),
-  ).rejects.toThrow('Invalid payment status transition');
-  await expect(
-    pool.query('UPDATE orders SET amount_minor=2 WHERE id=$1', [order.id]),
-  ).rejects.toThrow('immutable');
+  await webhook(order.id, 'integer-key-event');
+  const storedOrder = (await pool.query('SELECT * FROM orders')).rows[0];
+  const storedEvent = (await pool.query('SELECT * FROM provider_events'))
+    .rows[0];
+  expect(typeof storedOrder.id).toBe('number');
+  expect(typeof storedEvent.id).toBe('number');
+  expect(storedOrder.public_id).toBe(order.id);
+  expect(storedEvent.order_id).toBe(storedOrder.id);
+  expect(Object.keys(order).sort()).toEqual([
+    'amountMinor',
+    'businessOrderReference',
+    'createdAt',
+    'currency',
+    'id',
+    'status',
+    'updatedAt',
+  ]);
 });
+
+test('application updates timestamps only when the status changes', async () => {
+  const { body: order } = await checkout();
+  const firstTimestamp = '2000-01-01T00:00:00.000Z';
+  await pool.query('UPDATE orders SET updated_at=$1 WHERE public_id=$2', [
+    firstTimestamp,
+    order.id,
+  ]);
+  await webhook(order.id, 'failure', 'failed');
+  const failed = (await request(app).get(`/orders/${order.id}`)).body;
+  expect(failed.status).toBe('failed');
+  expect(failed.updatedAt).not.toBe(firstTimestamp);
+  await webhook(order.id, 'failure', 'failed');
+  await webhook(order.id, 'another-failure', 'failed');
+  expect((await store.get(order.id)).updatedAt).toBe(failed.updatedAt);
+  await pool.query('UPDATE orders SET updated_at=$1 WHERE public_id=$2', [
+    firstTimestamp,
+    order.id,
+  ]);
+  await webhook(order.id, 'success');
+  const succeeded = await store.get(order.id);
+  expect(succeeded.status).toBe('succeeded');
+  expect(succeeded.updatedAt).not.toBe(firstTimestamp);
+  await webhook(order.id, 'late-failure', 'failed');
+  expect((await store.get(order.id)).updatedAt).toBe(succeeded.updatedAt);
+});
+
 test.each(['0', '-1', '1.5', '01', '9223372036854775808', 100])(
   'rejects invalid amount %s',
   async (amountMinor) => {

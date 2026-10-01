@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { Pool } from 'pg';
 import { Configuration } from '#src/configuration/configuration';
 export async function migrate(pool: Pool) {
@@ -9,13 +9,22 @@ export async function migrate(pool: Pool) {
     await client.query(
       'CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY)',
     );
-    const applied = await client.query(
-      'SELECT version FROM schema_migrations WHERE version = $1',
-      ['001'],
+    const applied = await client.query<{ version: string }>(
+      'SELECT version FROM schema_migrations',
     );
-    if (!applied.rowCount) {
-      await client.query(await readFile('migrations/001_initial.sql', 'utf8'));
-      await client.query('INSERT INTO schema_migrations VALUES ($1)', ['001']);
+    const appliedVersions = new Set(applied.rows.map((row) => row.version));
+    const filenames = (await readdir('migrations'))
+      .filter((filename) => /^\d+_.+\.sql$/.test(filename))
+      .sort();
+    for (const filename of filenames) {
+      const version = filename.split('_')[0];
+      if (appliedVersions.has(version)) continue;
+      await client.query(await readFile(`migrations/${filename}`, 'utf8'));
+      await client.query(
+        'INSERT INTO schema_migrations (version) VALUES ($1)',
+        [version],
+      );
+      appliedVersions.add(version);
     }
     await client.query('COMMIT');
   } catch (error) {

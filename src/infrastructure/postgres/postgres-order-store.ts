@@ -11,7 +11,10 @@ import { ProviderEventConflict } from '#src/payments/domain/provider-event-confl
 import { orders, providerEvents } from '#src/infrastructure/postgres/schema';
 const toOrder = (row: typeof orders.$inferSelect): Order =>
   new Order({
-    ...row,
+    id: row.publicId,
+    businessOrderReference: row.businessOrderReference,
+    currency: row.currency,
+    status: row.status,
     amountMinor: row.amountMinor.toString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -25,7 +28,7 @@ export class PostgresOrderStore implements OrderStore {
         .insert(orders)
         .values({
           ...payload,
-          id: randomUUID(),
+          publicId: randomUUID(),
           amountMinor: BigInt(payload.amountMinor),
         })
         .onConflictDoNothing({ target: orders.businessOrderReference })
@@ -51,12 +54,12 @@ export class PostgresOrderStore implements OrderStore {
         const [order] = await tx
           .select()
           .from(orders)
-          .where(eq(orders.id, payload.orderId))
+          .where(eq(orders.publicId, payload.orderId))
           .for('update');
         if (!order) throw new OrderNotFound();
         const inserted = await tx
           .insert(providerEvents)
-          .values(payload)
+          .values({ ...payload, orderId: order.id })
           .onConflictDoNothing({ target: providerEvents.eventId })
           .returning();
         if (!inserted.length) {
@@ -65,7 +68,7 @@ export class PostgresOrderStore implements OrderStore {
             .from(providerEvents)
             .where(eq(providerEvents.eventId, payload.eventId));
           if (
-            existing.orderId !== payload.orderId ||
+            existing.orderId !== order.id ||
             existing.outcome !== payload.outcome
           )
             throw new ProviderEventConflict();
@@ -75,7 +78,7 @@ export class PostgresOrderStore implements OrderStore {
         if (status !== order.status)
           await tx
             .update(orders)
-            .set({ status })
+            .set({ status, updatedAt: new Date() })
             .where(eq(orders.id, order.id));
         return { duplicate: false };
       })
@@ -86,7 +89,10 @@ export class PostgresOrderStore implements OrderStore {
       });
   }
   async get(id: string) {
-    const [row] = await this.db.select().from(orders).where(eq(orders.id, id));
+    const [row] = await this.db
+      .select()
+      .from(orders)
+      .where(eq(orders.publicId, id));
     if (!row) throw new OrderNotFound();
     return toOrder(row);
   }

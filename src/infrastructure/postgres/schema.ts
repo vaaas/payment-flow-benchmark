@@ -1,7 +1,16 @@
-import { pgTable, uuid, text, bigint, timestamp } from 'drizzle-orm/pg-core';
+import {
+  pgTable,
+  uuid,
+  text,
+  bigint,
+  timestamp,
+  serial,
+  integer,
+} from 'drizzle-orm/pg-core';
 import type { PaymentStatus } from '#src/orders/domain/order';
 export const orders = pgTable('orders', {
-  id: uuid('id').primaryKey(),
+  id: serial('id').primaryKey(),
+  publicId: uuid('public_id').notNull().unique(),
   businessOrderReference: text('business_order_reference').notNull().unique(),
   amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
   currency: text('currency').notNull(),
@@ -14,8 +23,9 @@ export const orders = pgTable('orders', {
     .defaultNow(),
 });
 export const providerEvents = pgTable('provider_events', {
-  eventId: text('event_id').primaryKey(),
-  orderId: uuid('order_id')
+  id: serial('id').primaryKey(),
+  eventId: text('event_id').notNull().unique(),
+  orderId: integer('order_id')
     .notNull()
     .references(() => orders.id),
   outcome: text('outcome').$type<'failed' | 'succeeded'>().notNull(),
