@@ -1,5 +1,8 @@
 name: payment-flow-benchmark
 
+x-podman:
+  in_pod: false
+
 x-application: &application
   build: .
   image: payment-flow-benchmark-app
@@ -65,4 +68,3 @@ services:
 
 volumes:
   database-data:
-    name: payment-benchmark-data
