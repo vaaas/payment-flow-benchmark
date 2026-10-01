@@ -1,17 +1,11 @@
+import { installBus } from '#src/bootstrap/install-bus';
 import { OrderStore } from '#src/orders/domain/order-store';
 import { Container } from '#src/application/dependency-injection/container';
-import { CreateCheckout } from '#src/checkout/domain/create-checkout';
-import { ReceiveWebhook } from '#src/payments/domain/receive-webhook';
-import { GetOrder } from '#src/orders/domain/get-order';
 import request from 'supertest';
 import { Configuration } from '#src/configuration/configuration';
 import { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { App } from '#src/http/app';
-import { Bus } from '#src/application/bus';
-import { CreateCheckoutHandler } from '#src/checkout/application/create-checkout-handler';
-import { ReceiveWebhookHandler } from '#src/payments/application/receive-webhook-handler';
-import { GetOrderHandler } from '#src/orders/application/get-order-handler';
 import { PostgresOrderStore } from '#src/infrastructure/postgres/postgres-order-store';
 import { migrate } from '#src/infrastructure/postgres/migrate';
 const configuration = Configuration.fromEnv();
@@ -20,11 +14,7 @@ const container = new Container()
   .registerInstance(Pool, pool)
   .register(OrderStore, PostgresOrderStore);
 const store = container.get(OrderStore);
-const bus = new Bus()
-  .on(CreateCheckout, container.get(CreateCheckoutHandler))
-  .on(ReceiveWebhook, container.get(ReceiveWebhookHandler))
-  .on(GetOrder, container.get(GetOrderHandler));
-container.registerInstance(Bus, bus);
+container.install(installBus);
 const app = container.get(App).http;
 const payload = {
   businessOrderReference: 'merchant-123',

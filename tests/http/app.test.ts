@@ -1,3 +1,4 @@
+import { installBus } from '#src/bootstrap/install-bus';
 import { Container } from '#src/application/dependency-injection/container';
 import type {
   ErrorResponse,
@@ -6,9 +7,6 @@ import type {
 import request from 'supertest';
 import { App } from '#src/http/app';
 import { Bus } from '#src/application/bus';
-import { CreateCheckoutHandler } from '#src/checkout/application/create-checkout-handler';
-import { ReceiveWebhookHandler } from '#src/payments/application/receive-webhook-handler';
-import { GetOrderHandler } from '#src/orders/application/get-order-handler';
 import { OrderStore } from '#src/orders/domain/order-store';
 import { OrderNotFound } from '#src/orders/domain/order-not-found';
 import { Order } from '#src/orders/domain/order';
@@ -21,11 +19,8 @@ const store: jest.Mocked<OrderStore> = {
   get: jest.fn(),
 };
 const container = new Container().registerInstance(OrderStore, store);
-const bus = new Bus()
-  .on(CreateCheckout, container.get(CreateCheckoutHandler))
-  .on(ReceiveWebhook, container.get(ReceiveWebhookHandler))
-  .on(GetOrder, container.get(GetOrderHandler));
-container.registerInstance(Bus, bus);
+container.install(installBus);
+const bus = container.get(Bus);
 const app = container.get(App).http;
 beforeEach(() => jest.resetAllMocks());
 afterEach(() => jest.restoreAllMocks());
