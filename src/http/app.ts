@@ -1,29 +1,29 @@
+import express, { Express, Router } from 'express';
 import type { Container } from '#src/application/dependency-injection/container';
-import express, { Express } from 'express';
-import { Bus } from '#src/application/bus';
-import { CreateCheckoutRoute } from '#src/features/checkout/http/create-checkout-route';
-import { GetOrderRoute } from '#src/features/orders/http/get-order-route';
-import { ReceiveWebhookRoute } from '#src/features/payments/http/receive-webhook-route';
+import type { Installer } from '#src/application/installer';
 import { ErrorHandler } from '#src/http/error-handler';
 import { NotFoundRoute } from '#src/http/not-found-route';
 import { OpenApiRoute } from '#src/http/openapi-route';
 
 export class App {
   public static provide(container: Container): App {
-    return new App(container.get(Bus));
+    return new App(container);
   }
 
   public readonly http: Express;
+  public readonly routes: Router = express.Router();
 
-  constructor(bus: Bus) {
+  constructor(public readonly container: Container) {
     this.http = express();
     this.http.use(express.json({ limit: '16kb' }));
     this.http.get('/openapi.json', new OpenApiRoute().handle);
-    this.http.post('/checkout-intents', new CreateCheckoutRoute(bus).handle);
-    this.http.post('/webhooks/payment', new ReceiveWebhookRoute(bus).handle);
-    this.http.get('/orders/:id', new GetOrderRoute(bus).handle);
+    this.http.use(this.routes);
     this.http.use(new NotFoundRoute().handle);
     this.http.use(new ErrorHandler().handle);
+  }
+
+  public install(feature: Installer<App>): App {
+    return feature(this);
   }
 
   public listen(port = 3000, host = '0.0.0.0') {

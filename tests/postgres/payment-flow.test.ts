@@ -1,4 +1,4 @@
-import { installBus } from '#src/bootstrap/install-bus';
+import { installFeatures } from '#src/bootstrap/install-features';
 import { OrderStore } from '#src/features/orders/domain/order-store';
 import { Container } from '#src/application/dependency-injection/container';
 import request from 'supertest';
@@ -14,8 +14,8 @@ const container = new Container()
   .registerInstance(Pool, pool)
   .register(OrderStore, PostgresOrderStore);
 const store = container.get(OrderStore);
-container.install(installBus);
-const app = container.get(App).http;
+const application = container.get(App).install(installFeatures);
+const app = application.http;
 const payload = {
   businessOrderReference: 'merchant-123',
   amountMinor: '1999',

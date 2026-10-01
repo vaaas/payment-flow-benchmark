@@ -1,4 +1,4 @@
-import { installBus } from '#src/bootstrap/install-bus';
+import { installFeatures } from '#src/bootstrap/install-features';
 import { Container } from '#src/application/dependency-injection/container';
 import { OrderStore } from '#src/features/orders/domain/order-store';
 import { Pool } from 'pg';
@@ -14,9 +14,11 @@ const container = new Container()
         max: 10,
       }),
   })
-  .register(OrderStore, PostgresOrderStore)
-  .install(installBus);
-const server = container.get(App).listen(3000, '0.0.0.0');
+  .register(OrderStore, PostgresOrderStore);
+const server = container
+  .get(App)
+  .install(installFeatures)
+  .listen(3000, '0.0.0.0');
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.on(signal, () => {
     server.close(() => {

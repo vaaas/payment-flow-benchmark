@@ -1,8 +1,13 @@
+import type { Container } from '#src/application/dependency-injection/container';
 import type { RequestHandler } from 'express';
-import type { Bus } from '#src/application/bus';
+import { Bus } from '#src/application/bus';
 import { GetOrder } from '#src/features/orders/domain/get-order';
 
 export class GetOrderRoute {
+  public static provide(container: Container): GetOrderRoute {
+    return new GetOrderRoute(container.get(Bus));
+  }
+
   constructor(private readonly bus: Bus) {}
 
   public readonly handle: RequestHandler = async (request, response) => {

@@ -1,8 +1,13 @@
+import type { Container } from '#src/application/dependency-injection/container';
 import type { Installer } from '#src/application/installer';
 import type { Event, EventType } from '#src/application/event';
 import type { EventHandler } from '#src/application/event-handler';
 
 export class Bus {
+  public static provide(_container: Container): Bus {
+    return new Bus();
+  }
+
   public install(installer: Installer<Bus>): Bus {
     return installer(this);
   }

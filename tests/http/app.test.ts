@@ -1,4 +1,4 @@
-import { installBus } from '#src/bootstrap/install-bus';
+import { installFeatures } from '#src/bootstrap/install-features';
 import { Container } from '#src/application/dependency-injection/container';
 import type {
   ErrorResponse,
@@ -19,9 +19,9 @@ const store: jest.Mocked<OrderStore> = {
   get: jest.fn(),
 };
 const container = new Container().registerInstance(OrderStore, store);
-container.install(installBus);
 const bus = container.get(Bus);
-const app = container.get(App).http;
+const application = container.get(App).install(installFeatures);
+const app = application.http;
 beforeEach(() => jest.resetAllMocks());
 afterEach(() => jest.restoreAllMocks());
 test('invalid JSON and unknown fields never reach persistence', async () => {
