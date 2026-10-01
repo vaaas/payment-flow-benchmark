@@ -7,6 +7,7 @@ export class Configuration {
   }
 
   private static readonly schema = z.object({
+    API_KEY: z.string().regex(/^\S+$/).default('benchmark-api-key'),
     DATABASE_URL: z
       .string()
       .url()
@@ -20,10 +21,13 @@ export class Configuration {
 
   public static fromEnv(env: NodeJS.ProcessEnv = process.env): Configuration {
     const parsed = Configuration.schema.parse(env);
-    return new Configuration(parsed.DATABASE_URL);
+    return new Configuration(parsed.DATABASE_URL, parsed.API_KEY);
   }
 
-  private constructor(public readonly databaseUrl: string) {
+  private constructor(
+    public readonly databaseUrl: string,
+    public readonly apiKey: string,
+  ) {
     Object.freeze(this);
   }
 }

@@ -1,3 +1,4 @@
+import { Configuration } from '#src/configuration/configuration';
 import { installFeatures } from '#src/bootstrap/install-features';
 import { Container } from '#src/application/dependency-injection/container';
 import type {
@@ -18,7 +19,12 @@ const store: jest.Mocked<OrderStore> = {
   receive: jest.fn(),
   get: jest.fn(),
 };
-const container = new Container().registerInstance(OrderStore, store);
+const configuration = Configuration.fromEnv({
+  DATABASE_URL: 'postgresql://postgres:benchmark@database:5432/checkout_test',
+});
+const container = new Container()
+  .registerInstance(Configuration, configuration)
+  .registerInstance(OrderStore, store);
 const bus = container.get(Bus);
 const application = container.get(App).install(installFeatures);
 const app = application.http;
@@ -29,18 +35,22 @@ test('invalid JSON and unknown fields never reach persistence', async () => {
     (
       await request(app)
         .post('/checkout-intents')
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
         .set('Content-Type', 'application/json')
         .send('{')
     ).status,
   ).toBe(400);
   expect(
     (
-      await request(app).post('/checkout-intents').send({
-        businessOrderReference: 'x',
-        amountMinor: '1',
-        currency: 'EUR',
-        extra: true,
-      })
+      await request(app)
+        .post('/checkout-intents')
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
+        .send({
+          businessOrderReference: 'x',
+          amountMinor: '1',
+          currency: 'EUR',
+          extra: true,
+        })
     ).status,
   ).toBe(400);
   expect(store.create).not.toHaveBeenCalled();
@@ -48,10 +58,19 @@ test('invalid JSON and unknown fields never reach persistence', async () => {
 test('unknown order and malformed UUID produce distinct responses', async () => {
   store.get.mockRejectedValue(new OrderNotFound());
   expect(
-    (await request(app).get('/orders/11111111-1111-4111-8111-111111111111'))
-      .status,
+    (
+      await request(app)
+        .get('/orders/11111111-1111-4111-8111-111111111111')
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
+    ).status,
   ).toBe(404);
-  expect((await request(app).get('/orders/bad')).status).toBe(400);
+  expect(
+    (
+      await request(app)
+        .get('/orders/bad')
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
+    ).status,
+  ).toBe(400);
 });
 test('webhook acknowledgement waits for persistence completion', async () => {
   let complete!: (value: { duplicate: boolean }) => void;
@@ -92,6 +111,7 @@ test('checkout route dispatches a parsed immutable domain command', async () => 
   const dispatch = jest.spyOn(bus, 'dispatch');
   const response = await request(app)
     .post('/checkout-intents')
+    .set('Authorization', `Bearer ${configuration.apiKey}`)
     .send(checkoutPayload);
 
   expect(response.status).toBe(201);
@@ -125,7 +145,9 @@ test('webhook route dispatches a parsed immutable domain command', async () => {
 test('order route dispatches a parsed immutable domain query', async () => {
   store.get.mockResolvedValue(order);
   const dispatch = jest.spyOn(bus, 'dispatch');
-  const response = await request(app).get(`/orders/${order.id}`);
+  const response = await request(app)
+    .get(`/orders/${order.id}`)
+    .set('Authorization', `Bearer ${configuration.apiKey}`);
 
   expect(response.status).toBe(200);
   expect(response.body).toEqual({ ...order });
@@ -179,7 +201,9 @@ test('middleware accepts an unknown error implementing IRespondable', async () =
     }
   }
   store.get.mockRejectedValue(new RateLimited());
-  const response = await request(app).get(`/orders/${order.id}`);
+  const response = await request(app)
+    .get(`/orders/${order.id}`)
+    .set('Authorization', `Bearer ${configuration.apiKey}`);
   expect(response.status).toBe(429);
   expect(response.body).toEqual({
     error: 'Try again later',
@@ -195,7 +219,9 @@ test.each([
   async (error) => {
     store.get.mockRejectedValue(error);
     const log = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const response = await request(app).get(`/orders/${order.id}`);
+    const response = await request(app)
+      .get(`/orders/${order.id}`)
+      .set('Authorization', `Bearer ${configuration.apiKey}`);
     expect(response.status).toBe(503);
     expect(response.body).toEqual({
       error: 'Processing failed; retry the identical request',

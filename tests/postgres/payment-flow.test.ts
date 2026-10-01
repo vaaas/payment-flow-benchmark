@@ -12,6 +12,7 @@ const configuration = Configuration.fromEnv();
 const pool = new Pool({ connectionString: configuration.databaseUrl, max: 20 });
 const container = new Container()
   .registerInstance(Pool, pool)
+  .registerInstance(Configuration, configuration)
   .register(OrderStore, PostgresOrderStore);
 const store = container.get(OrderStore);
 const application = container.get(App).install(installFeatures);
@@ -22,7 +23,10 @@ const payload = {
   currency: 'EUR',
 };
 const checkout = (body = payload) =>
-  request(app).post('/checkout-intents').send(body);
+  request(app)
+    .post('/checkout-intents')
+    .set('Authorization', `Bearer ${configuration.apiKey}`)
+    .send(body);
 const webhook = (orderId: string, eventId: string, outcome = 'succeeded') =>
   request(app).post('/webhooks/payment').send({ orderId, eventId, outcome });
 beforeAll(async () => {
@@ -50,8 +54,11 @@ test('concurrent checkout retries create exactly one immutable order', async () 
   const firstResponse = responses[0];
   if (!firstResponse) throw new Error('Expected checkout responses');
   expect(
-    (await request(app).get(`/orders/${firstResponse.body.id}`)).body
-      .amountMinor,
+    (
+      await request(app)
+        .get(`/orders/${firstResponse.body.id}`)
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
+    ).body.amountMinor,
   ).toBe('1999');
   expect((await pool.query('SELECT * FROM orders')).rowCount).toBe(1);
 });
@@ -72,17 +79,25 @@ test('duplicate webhook deliveries commit once and acknowledge retries', async (
   expect(results.every((r) => r.status === 200)).toBe(true);
   expect(results.filter((r) => !r.body.duplicate)).toHaveLength(1);
   expect((await pool.query('SELECT * FROM provider_events')).rowCount).toBe(1);
-  expect((await request(app).get(`/orders/${order.id}`)).body.status).toBe(
-    'succeeded',
-  );
+  expect(
+    (
+      await request(app)
+        .get(`/orders/${order.id}`)
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
+    ).body.status,
+  ).toBe('succeeded');
   expect((await webhook(order.id, 'event-1', 'failed')).status).toBe(409);
 });
 test('conflicting event IDs and out-of-order deliveries always preserve success', async () => {
   const { body: order } = await checkout();
   expect((await webhook(order.id, 'failed-first', 'failed')).status).toBe(200);
-  expect((await request(app).get(`/orders/${order.id}`)).body.status).toBe(
-    'failed',
-  );
+  expect(
+    (
+      await request(app)
+        .get(`/orders/${order.id}`)
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
+    ).body.status,
+  ).toBe('failed');
   const results = await Promise.all(
     Array.from({ length: 30 }, (_, i) =>
       webhook(order.id, `event-${i}`, i % 2 ? 'succeeded' : 'failed'),
@@ -90,9 +105,13 @@ test('conflicting event IDs and out-of-order deliveries always preserve success'
   );
   expect(results.every((r) => r.status === 200)).toBe(true);
   await webhook(order.id, 'late-failure', 'failed');
-  expect((await request(app).get(`/orders/${order.id}`)).body.status).toBe(
-    'succeeded',
-  );
+  expect(
+    (
+      await request(app)
+        .get(`/orders/${order.id}`)
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
+    ).body.status,
+  ).toBe('succeeded');
   expect((await pool.query('SELECT * FROM provider_events')).rowCount).toBe(32);
 });
 test('changed event order cannot apply to another order', async () => {
@@ -102,9 +121,13 @@ test('changed event order cannot apply to another order', async () => {
   ).body;
   await webhook(first.id, 'event');
   expect((await webhook(second.id, 'event')).status).toBe(409);
-  expect((await request(app).get(`/orders/${second.id}`)).body.status).toBe(
-    'pending',
-  );
+  expect(
+    (
+      await request(app)
+        .get(`/orders/${second.id}`)
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
+    ).body.status,
+  ).toBe('pending');
 });
 test('concurrent changed event payloads commit only one event', async () => {
   const { body: order } = await checkout();
@@ -114,9 +137,13 @@ test('concurrent changed event payloads commit only one event', async () => {
   ]);
   expect(responses.map((r) => r.status).sort()).toEqual([200, 409]);
   const event = (await pool.query('SELECT * FROM provider_events')).rows[0];
-  expect((await request(app).get(`/orders/${order.id}`)).body.status).toBe(
-    event.outcome,
-  );
+  expect(
+    (
+      await request(app)
+        .get(`/orders/${order.id}`)
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
+    ).body.status,
+  ).toBe(event.outcome);
 });
 test('unknown orders do not consume event IDs', async () => {
   expect((await webhook(randomUUID(), 'retryable')).status).toBe(404);
@@ -175,7 +202,11 @@ test('application updates timestamps only when the status changes', async () => 
     order.id,
   ]);
   await webhook(order.id, 'failure', 'failed');
-  const failed = (await request(app).get(`/orders/${order.id}`)).body;
+  const failed = (
+    await request(app)
+      .get(`/orders/${order.id}`)
+      .set('Authorization', `Bearer ${configuration.apiKey}`)
+  ).body;
   expect(failed.status).toBe('failed');
   expect(failed.updatedAt).not.toBe(firstTimestamp);
   await webhook(order.id, 'failure', 'failed');
@@ -200,6 +231,7 @@ test.each(['0', '-1', '1.5', '01', '9223372036854775808', 100])(
       (
         await request(app)
           .post('/checkout-intents')
+          .set('Authorization', `Bearer ${configuration.apiKey}`)
           .send({ ...payload, amountMinor })
       ).status,
     ).toBe(400);

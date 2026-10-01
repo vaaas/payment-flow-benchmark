@@ -93,8 +93,23 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, malformed, or incorrect bearer API key. Includes WWW-Authenticate: Bearer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerApiKey": []
+          }
+        ]
       }
     },
     "/webhooks/payment": {
@@ -236,8 +251,23 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Missing, malformed, or incorrect bearer API key. Includes WWW-Authenticate: Bearer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "BearerApiKey": []
+          }
+        ]
       }
     },
     "/openapi.json": {
@@ -387,6 +417,13 @@
             "description": "Changes on order changes, not retries or ignored events."
           }
         }
+      }
+    },
+    "securitySchemes": {
+      "BearerApiKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Sample shared API key: benchmark-api-key. Configure API_KEY to change it."
       }
     }
   }

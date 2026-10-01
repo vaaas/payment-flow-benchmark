@@ -1,3 +1,4 @@
+import { Configuration } from '#src/configuration/configuration';
 import request from 'supertest';
 import { Bus } from '#src/application/bus';
 import { Container } from '#src/application/dependency-injection/container';
@@ -25,19 +26,36 @@ test('one feature installation wires its dependencies, events and routes without
     receive: jest.fn(),
     get: jest.fn(),
   };
-  const container = new Container().registerInstance(OrderStore, store);
+  const configuration = Configuration.fromEnv({
+    DATABASE_URL: 'postgresql://postgres:benchmark@database:5432/checkout_test',
+  });
+  const container = new Container()
+    .registerInstance(Configuration, configuration)
+    .registerInstance(OrderStore, store);
   const app = container.get(App);
   expect(
-    (await request(app.http).post('/checkout-intents').send(payload)).status,
+    (
+      await request(app.http)
+        .post('/checkout-intents')
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
+        .send(payload)
+    ).status,
   ).toBe(404);
   expect(app.install(installCheckoutFeature)).toBe(app);
   const response = await request(app.http)
     .post('/checkout-intents')
+    .set('Authorization', `Bearer ${configuration.apiKey}`)
     .send(payload);
   expect(response.status).toBe(201);
   expect(response.body.id).toBe(order.id);
   expect(store.create).toHaveBeenCalledWith(payload);
-  expect((await request(app.http).get(`/orders/${order.id}`)).status).toBe(404);
+  expect(
+    (
+      await request(app.http)
+        .get(`/orders/${order.id}`)
+        .set('Authorization', `Bearer ${configuration.apiKey}`)
+    ).status,
+  ).toBe(404);
   expect(
     (await request(app.http).post('/webhooks/payment').send({})).status,
   ).toBe(404);

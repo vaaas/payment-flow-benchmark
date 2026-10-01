@@ -1,3 +1,4 @@
+import { BearerAuthentication } from '#src/http/authentication/bearer-authentication';
 import type { App } from '#src/http/app';
 import { Bus } from '#src/application/bus';
 import { CreateCheckoutHandler } from '#src/features/checkout/application/create-checkout-handler';
@@ -11,6 +12,7 @@ export function installCheckoutFeature(app: App): App {
   container.get(Bus).install(installCheckoutEvents(container));
   app.routes.post(
     '/checkout-intents',
+    container.get(BearerAuthentication).handle,
     container.get(CreateCheckoutRoute).handle,
   );
   return app;

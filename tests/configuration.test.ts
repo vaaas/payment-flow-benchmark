@@ -7,6 +7,7 @@ test('Configuration parses an injected environment into an immutable snapshot', 
   const configuration = Configuration.fromEnv(env);
   env.DATABASE_URL = 'postgresql://other:other@database:5432/other';
   expect(configuration.databaseUrl).toBe(databaseUrl);
+  expect(configuration.apiKey).toBe('benchmark-api-key');
   expect(Object.isFrozen(configuration)).toBe(true);
 });
 
@@ -14,6 +15,8 @@ test.each([
   {},
   { DATABASE_URL: 'invalid' },
   { DATABASE_URL: 'https://example.com/checkout' },
+  { DATABASE_URL: databaseUrl, API_KEY: '' },
+  { DATABASE_URL: databaseUrl, API_KEY: 'invalid key' },
 ])('Configuration rejects an invalid environment: %j', (env) => {
   expect(() => Configuration.fromEnv(env)).toThrow();
 });
