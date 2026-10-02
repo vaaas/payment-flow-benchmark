@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { Currency } from '#src/shared/domain/currency';
 import type { Response } from 'supertest';
 import { createFixture, validCheckout } from '#tests/support/e2e-fixture';
 import {
@@ -284,4 +285,18 @@ test('the documented security scheme is the one enforced', async () => {
     .send(validCheckout);
   expect(unauthenticated.headers['www-authenticate']).toBe('Bearer');
   expect(unauthenticated.status).toBe(401);
+});
+
+test('the currencies listed in the specification are exactly the ones accepted', async () => {
+  const listed = schemaNamed('Currency').enum;
+  expect(listed).toEqual(Currency.codes());
+  for (const [index, code] of Currency.codes().entries()) {
+    const response = await fixture.checkout({
+      ...validCheckout,
+      businessOrderReference: `listed-${index}`,
+      currency: code,
+    });
+    expect(response.status).toBe(201);
+    expect(response.body.currency).toBe(code);
+  }
 });
