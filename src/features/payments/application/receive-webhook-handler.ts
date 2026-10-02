@@ -36,9 +36,9 @@ export class ReceiveWebhookHandler implements EventHandler<ReceiveWebhook> {
           throw new ProviderEventConflict();
         return { duplicate: true };
       }
-      const status = order.paymentStatusAfter(outcome);
-      if (status !== order.status)
-        await session.updateStatus(order.id, status, this.clock.now());
+      const settled = order.applyOutcome(outcome, this.clock.now());
+      if (settled !== order)
+        await session.updateStatus(order.id, settled.status, settled.updatedAt);
       return { duplicate: false };
     });
   }

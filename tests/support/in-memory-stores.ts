@@ -10,7 +10,7 @@ import {
 } from '#src/features/orders/domain/order-id';
 import { Clock } from '#src/shared/domain/clock';
 import { Timestamp } from '#src/shared/domain/timestamp';
-import type { PaymentStatus } from '#src/features/orders/domain/order';
+import type { PaymentStatus } from '#src/features/orders/domain/payment-status';
 import type { OrderReader } from '#src/features/orders/domain/order-reader';
 import type {
   PaymentSession,

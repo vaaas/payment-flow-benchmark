@@ -1,15 +1,14 @@
-import { z } from 'zod';
 import type { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
 import type { OrderId } from '#src/features/orders/domain/order-id';
 import type { Amount } from '#src/shared/domain/amount';
 import type { Timestamp } from '#src/shared/domain/timestamp';
 import type { Currency } from '#src/shared/domain/currency';
 import type { Checkout } from '#src/features/checkout/domain/create-checkout';
-import type { PaymentOutcome } from '#src/features/payments/domain/receive-webhook';
-
-export const paymentStatusSchema = z.enum(['pending', 'failed', 'succeeded']);
-
-export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
+import { nextPaymentStatus } from '#src/features/orders/domain/payment-status';
+import type {
+  PaymentOutcome,
+  PaymentStatus,
+} from '#src/features/orders/domain/payment-status';
 
 export type OrderSnapshot = Checkout &
   Readonly<{
@@ -61,7 +60,8 @@ export class Order implements OrderSnapshot {
     );
   }
 
-  paymentStatusAfter(outcome: PaymentOutcome): PaymentStatus {
-    return this.status === 'succeeded' ? this.status : outcome;
+  applyOutcome(outcome: PaymentOutcome, at: Timestamp): Order {
+    const status = nextPaymentStatus(this.status, outcome);
+    return status === this.status ? this : this.withStatus(status, at);
   }
 }

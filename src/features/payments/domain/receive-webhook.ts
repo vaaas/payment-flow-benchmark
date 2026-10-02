@@ -1,9 +1,11 @@
 import { Event } from '#src/application/event';
 import { z } from 'zod';
+import {
+  paymentOutcomeSchema,
+  type PaymentOutcome,
+} from '#src/features/orders/domain/payment-status';
 import { OrderId } from '#src/features/orders/domain/order-id';
 import { ProviderEventId } from '#src/features/payments/domain/provider-event-id';
-
-export type PaymentOutcome = 'failed' | 'succeeded';
 
 export type ProviderEvent = Readonly<{
   eventId: ProviderEventId;
@@ -17,7 +19,7 @@ export class ReceiveWebhook extends Event<WebhookReceipt> {
   private static readonly schema = z.strictObject({
     eventId: ProviderEventId.schema,
     orderId: OrderId.schema,
-    outcome: z.enum(['failed', 'succeeded']),
+    outcome: paymentOutcomeSchema,
   });
 
   public static from(input: unknown): ReceiveWebhook {

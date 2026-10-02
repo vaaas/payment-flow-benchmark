@@ -1,7 +1,8 @@
 import type { OrderId } from '#src/features/orders/domain/order-id';
 import type { ProviderEventId } from '#src/features/payments/domain/provider-event-id';
 import type { Timestamp } from '#src/shared/domain/timestamp';
-import type { Order, PaymentStatus } from '#src/features/orders/domain/order';
+import type { Order } from '#src/features/orders/domain/order';
+import type { PaymentStatus } from '#src/features/orders/domain/payment-status';
 import type { ProviderEvent } from '#src/features/payments/domain/receive-webhook';
 
 export interface PaymentSession {

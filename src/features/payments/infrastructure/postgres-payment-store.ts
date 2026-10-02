@@ -2,7 +2,8 @@ import { eq, sql } from 'drizzle-orm';
 import type { Container } from '#src/application/dependency-injection/container';
 import type { OrderId } from '#src/features/orders/domain/order-id';
 import type { ProviderEventId } from '#src/features/payments/domain/provider-event-id';
-import type { Order, PaymentStatus } from '#src/features/orders/domain/order';
+import type { Order } from '#src/features/orders/domain/order';
+import type { PaymentStatus } from '#src/features/orders/domain/payment-status';
 import { toOrder } from '#src/features/orders/infrastructure/order-mapper';
 import type {
   PaymentSession,

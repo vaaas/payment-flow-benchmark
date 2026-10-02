@@ -1,4 +1,5 @@
-import { Order, paymentStatusSchema } from '#src/features/orders/domain/order';
+import { Order } from '#src/features/orders/domain/order';
+import { paymentStatusSchema } from '#src/features/orders/domain/payment-status';
 import { Amount } from '#src/shared/domain/amount';
 import { Timestamp } from '#src/shared/domain/timestamp';
 import { Currency } from '#src/shared/domain/currency';
