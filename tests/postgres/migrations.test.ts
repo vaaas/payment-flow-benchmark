@@ -49,3 +49,61 @@ test('fresh migrations are repeatable and leave integer primary keys without pol
     WHERE nspname='migration_test' AND NOT tgisinternal`);
   expect(triggers.rows).toEqual([]);
 });
+
+test('concurrent migrations on a fresh database apply each version exactly once', async () => {
+  await Promise.all(Array.from({ length: 6 }, () => migrate(database)));
+  const versions = await database.query(
+    'SELECT version FROM schema_migrations',
+  );
+  expect(versions.rows).toEqual([{ version: '001' }]);
+  const tables = await database.query(
+    `SELECT table_name FROM information_schema.tables
+     WHERE table_schema = 'migration_test' ORDER BY table_name`,
+  );
+  expect(tables.rows.map((row) => row.table_name)).toEqual([
+    'checkout_idempotency_keys',
+    'orders',
+    'provider_events',
+    'schema_migrations',
+  ]);
+});
+
+test('re-running migrations preserves existing data', async () => {
+  await migrate(database);
+  await database.query(
+    `INSERT INTO orders (public_id, business_order_reference, amount_minor, currency)
+     VALUES ('11111111-1111-4111-8111-111111111111', 'kept', 1999, 'EUR')`,
+  );
+  await migrate(database);
+  const rows = await database.query(
+    'SELECT business_order_reference FROM orders',
+  );
+  expect(rows.rows).toEqual([{ business_order_reference: 'kept' }]);
+});
+
+test('migrations adopt a database whose versions are already recorded', async () => {
+  await migrate(database);
+  await database.query('DROP TABLE checkout_idempotency_keys');
+  await migrate(database);
+  const tables = await database.query(
+    `SELECT table_name FROM information_schema.tables
+     WHERE table_schema = 'migration_test' AND table_name = 'checkout_idempotency_keys'`,
+  );
+  expect(tables.rows).toEqual([]);
+});
+
+test('a migration that cannot run leaves no version recorded and releases its connection', async () => {
+  await database.query('CREATE TABLE orders (id integer)');
+  await expect(migrate(database)).rejects.toThrow();
+  const recorded = await database.query(
+    `SELECT count(*)::int AS total FROM information_schema.tables
+     WHERE table_schema = 'migration_test' AND table_name = 'schema_migrations'`,
+  );
+  expect(recorded.rows[0].total).toBe(0);
+  await database.query('DROP TABLE orders');
+  await migrate(database);
+  const versions = await database.query(
+    'SELECT version FROM schema_migrations',
+  );
+  expect(versions.rows).toEqual([{ version: '001' }]);
+});
