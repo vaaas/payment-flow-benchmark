@@ -31,9 +31,9 @@
     "prettier": "3.9.6",
     "prettier-plugin-sh": "0.20.2",
     "supertest": "7.1.4",
-    "ts-jest": "29.4.1",
+    "ts-jest": "29.4.14",
     "tsx": "4.20.5",
-    "typescript": "5.9.2"
+    "typescript": "6.0.3"
   },
   "imports": {
     "#src/*": "./dist/src/*.js",
