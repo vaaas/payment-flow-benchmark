@@ -29,16 +29,17 @@ export class ErrorHandler {
   private respondable(error: unknown): IRespondable {
     if (isRespondable(error)) return error;
     if (error instanceof z.ZodError) {
-      return new HttpError(HttpStatus.badRequest, 'Invalid request', error.issues);
+      return new HttpError(
+        HttpStatus.badRequest,
+        'Invalid request',
+        error.issues,
+      );
     }
     if (error instanceof URIError) {
       return new HttpError(HttpStatus.badRequest, 'Invalid request');
     }
     if (this.isClientBodyError(error)) {
-      return new HttpError(
-        HttpStatus.parse(error.status),
-        'Invalid JSON body',
-      );
+      return new HttpError(HttpStatus.parse(error.status), 'Invalid JSON body');
     }
     console.error(error);
     return new HttpError(

@@ -2,10 +2,7 @@ import type { z } from 'zod';
 import { z as zod } from 'zod';
 import { newtype } from '#src/shared/domain/newtype';
 
-const httpStatus = newtype(
-  'HttpStatus',
-  zod.number().int().min(100).max(599),
-);
+const httpStatus = newtype('HttpStatus', zod.number().int().min(100).max(599));
 
 export type HttpStatus = z.output<typeof httpStatus.schema>;
 

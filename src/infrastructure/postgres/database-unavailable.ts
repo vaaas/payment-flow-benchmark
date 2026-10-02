@@ -10,6 +10,9 @@ export class DatabaseUnavailable extends Error implements IRespondable {
   }
 
   public response(): ErrorResponse {
-    return { status: HttpStatus.serviceUnavailable, body: { error: this.message } };
+    return {
+      status: HttpStatus.serviceUnavailable,
+      body: { error: this.message },
+    };
   }
 }

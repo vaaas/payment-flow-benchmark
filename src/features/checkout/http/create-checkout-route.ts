@@ -17,6 +17,8 @@ export class CreateCheckoutRoute {
       request.get('Idempotency-Key'),
     );
     const result = await this.bus.dispatch(command);
-    response.status(result.created ? HttpStatus.created : HttpStatus.ok).json(result.order);
+    response
+      .status(result.created ? HttpStatus.created : HttpStatus.ok)
+      .json(result.order);
   };
 }

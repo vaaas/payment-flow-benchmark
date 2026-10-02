@@ -28,6 +28,11 @@ export class BearerAuthentication {
       return;
     }
     response.set('WWW-Authenticate', 'Bearer');
-    next(new HttpError(HttpStatus.unauthorized, 'Invalid or missing bearer API key'));
+    next(
+      new HttpError(
+        HttpStatus.unauthorized,
+        'Invalid or missing bearer API key',
+      ),
+    );
   };
 }

@@ -31,11 +31,14 @@ export class RateLimiter {
     if (this.requests >= this.configuration.rateLimitMax) {
       response.set(
         'Retry-After',
-        String(
-          Math.ceil(Milliseconds.minus(this.windowEndsAt, now) / 1000),
+        String(Math.ceil(Milliseconds.minus(this.windowEndsAt, now) / 1000)),
+      );
+      next(
+        new HttpError(
+          HttpStatus.tooManyRequests,
+          'Too many requests; retry later',
         ),
       );
-      next(new HttpError(HttpStatus.tooManyRequests, 'Too many requests; retry later'));
       return;
     }
     this.requests++;

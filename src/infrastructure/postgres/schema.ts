@@ -10,6 +10,7 @@ import {
 import type { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
 import type { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
 import type { OrderId } from '#src/features/orders/domain/order-id';
+import type { CurrencyCode } from '#src/shared/domain/currency-code';
 import type { PaymentStatus } from '#src/features/orders/domain/order';
 import type { ProviderEventId } from '#src/features/payments/domain/provider-event-id';
 export const orders = pgTable('orders', {
@@ -20,7 +21,7 @@ export const orders = pgTable('orders', {
     .notNull()
     .unique(),
   amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
-  currency: text('currency').notNull(),
+  currency: text('currency').$type<CurrencyCode>().notNull(),
   status: text('status').$type<PaymentStatus>().notNull().default('pending'),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()

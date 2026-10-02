@@ -1,5 +1,6 @@
 import * as isoCurrencies from 'currency-codes';
 import { z } from 'zod';
+import { CurrencyCode } from '#src/shared/domain/currency-code';
 import { MinorUnitDigits } from '#src/shared/domain/minor-unit-digits';
 
 const nonCurrencyCodes = new Set([
@@ -22,7 +23,13 @@ export class Currency {
   private static readonly known = new Map<string, Currency>(
     isoCurrencies.data
       .filter((record) => !nonCurrencyCodes.has(record.code))
-      .map((record) => [record.code, new Currency(record.code, MinorUnitDigits.parse(record.digits))]),
+      .map((record) => [
+        record.code,
+        new Currency(
+          CurrencyCode.parse(record.code),
+          MinorUnitDigits.parse(record.digits),
+        ),
+      ]),
   );
 
   public static readonly schema = z.string().transform((code, context) => {
@@ -43,12 +50,12 @@ export class Currency {
     return currency;
   }
 
-  public static codes(): string[] {
-    return [...Currency.known.keys()].sort();
+  public static codes(): CurrencyCode[] {
+    return [...Currency.known.values()].map((currency) => currency.code).sort();
   }
 
   private constructor(
-    public readonly code: string,
+    public readonly code: CurrencyCode,
     public readonly minorUnitDigits: MinorUnitDigits,
   ) {
     Object.freeze(this);
