@@ -27,7 +27,7 @@ Project configuration is defined via environment variables. `Configuration.ts` i
 
 Typescript is used for typechecking with maximum realistic strictness.
 
-Database initialisation is encapsulated under `infrastructure/postgres/database.ts`
+`src/infrastructure/postgres` holds cross-cutting database concerns only: the connection (`database.ts`), the schema, migrations, and a generic transaction helper. It contains no business logic.
 
 We use the Command pattern and a CQRS-like architecture to encourage single-action controllers and single-responsibility database operations.
 
@@ -39,11 +39,14 @@ Barebones rate-limitting is provided as a sample in `src/http/rate-limiting/rate
 
 Application features are organised in the `src/features` directory. We have 3 features: `checkout`, `orders`, and `payments`. Each feature defines an installer, allowing for straightforward registration of its behavior on our `App` by changing a single line of code.
 
-Every feature is roughly organised into 3 layers:
+Every feature is roughly organised into 4 layers:
 
 - domain layer: defines domain objects or data transfer objects (i.e. data structures)
 - http layer: the http port of our application (as opposed to, say, websocket ports)
-- application layer: where business logic happens
+- application layer: where business logic happens, in one handler per command or query
+- infrastructure layer: persistence adapters (here, Postgres queries) that implement the feature's port
+
+Each feature owns a narrow persistence port in its domain layer: `CheckoutStore` and `PaymentStore` run work in a transaction through a session of single-purpose operations, and `OrderReader` is the read side. Handlers make the decisions (retry or conflict, key replay, status change, duplicate or conflicting event). Adapters only run queries. `src/bootstrap/install-postgres-stores.ts` wires the Postgres adapters.
 
 Feature splitting is excessive for this project as arguably all 3 belong in the same cohesive feature, but the structure shows how a modular monolith could be organised.
 
@@ -131,4 +134,4 @@ Checkouts insert-on-conflict and perform payload comparison in one transaction. 
 
 Each webhook locks its order with `SELECT FOR UPDATE`, inserts its event using the unique event ID, compares payload on conflict, and updates status in the same transaction. Locking before insertion also avoids foreign-key deadlocks between events on one order.
 
-Different orders can process concurrently. An event ID reused for another existing order or outcome is rejected, never reapplied. The immutable `Order` chooses status changes in the application while its row is locked. The store updates only status and `updatedAt`; checkout fields have no update operation. The database enforces uniqueness, foreign keys, and non-null columns only. Value rules (lengths, amount range, currency format, outcomes) live in the request parsers, and stored statuses are parsed again when read. There are no `CHECK` constraints and no transition trigger.
+Different orders can process concurrently. An event ID reused for another existing order or outcome is rejected, never reapplied. The immutable `Order` chooses status changes in the application while its row is locked. The payment session updates only status and `updatedAt`; checkout fields have no update operation. The database enforces uniqueness, foreign keys, and non-null columns only. Value rules (lengths, amount range, currency format, outcomes) live in the request parsers, and stored statuses are parsed again when read. There are no `CHECK` constraints and no transition trigger.
