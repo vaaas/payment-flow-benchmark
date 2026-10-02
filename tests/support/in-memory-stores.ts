@@ -2,7 +2,6 @@ import type {
   CheckoutSession,
   CheckoutStore,
 } from '#src/features/checkout/domain/checkout-store';
-import type { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
 import type { ProviderEventId } from '#src/features/payments/domain/provider-event-id';
 import { Order } from '#src/features/orders/domain/order';
 import {
@@ -22,20 +21,17 @@ import type { ProviderEvent } from '#src/features/payments/domain/receive-webhoo
 export class InMemoryOrderData {
   public orders = new Map<OrderId, Order>();
   public events = new Map<ProviderEventId, ProviderEvent>();
-  public submissions = new Map<IdempotencyKey, OrderId>();
 
   public snapshot() {
     return {
       orders: new Map(this.orders),
       events: new Map(this.events),
-      submissions: new Map(this.submissions),
     };
   }
 
   public restore(snapshot: ReturnType<InMemoryOrderData['snapshot']>) {
     this.orders = snapshot.orders;
     this.events = snapshot.events;
-    this.submissions = snapshot.submissions;
   }
 
   public async transaction<T>(work: () => Promise<T>): Promise<T> {
@@ -60,11 +56,7 @@ export class InMemoryCheckoutStore implements CheckoutStore {
 
   private session(): CheckoutSession {
     const { data } = this;
-    const find = (id: OrderId | undefined) =>
-      id === undefined ? undefined : data.orders.get(id);
     return {
-      lockSubmission: async () => undefined,
-      findBySubmission: async (key) => find(data.submissions.get(key)),
       insertIfAbsent: async (order: Order) => {
         const taken = [...data.orders.values()].some(
           (existing) =>
@@ -78,9 +70,6 @@ export class InMemoryCheckoutStore implements CheckoutStore {
         [...data.orders.values()].find(
           (order) => order.businessOrderReference === reference,
         ),
-      bindSubmission: async (key, orderId) => {
-        data.submissions.set(key, orderId);
-      },
     };
   }
 }

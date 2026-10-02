@@ -46,9 +46,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
-  await pool.query(
-    'TRUNCATE checkout_idempotency_keys, provider_events, orders',
-  );
+  await pool.query('TRUNCATE provider_events, orders');
 });
 
 afterAll(async () => {
@@ -269,112 +267,6 @@ test('bigint amounts round-trip exactly', async () => {
     (await checkout({ ...payload, amountMinor: '9223372036854775807' })).body
       .amountMinor,
   ).toBe('9223372036854775807');
-});
-
-test('concurrent changed submissions sharing a key select exactly one order', async () => {
-  const responses = await Promise.all(
-    Array.from({ length: 20 }, (_, index) =>
-      checkout({
-        ...payload,
-        businessOrderReference: `submission-${index}`,
-        amountMinor: String(index + 1),
-      }).set('Idempotency-Key', 'shared-submission'),
-    ),
-  );
-  expect(responses.filter((response) => response.status === 201)).toHaveLength(
-    1,
-  );
-  expect(responses.filter((response) => response.status === 200)).toHaveLength(
-    19,
-  );
-  expect(new Set(responses.map((response) => response.body.id)).size).toBe(1);
-  expect(
-    new Set(responses.map((response) => response.body.businessOrderReference))
-      .size,
-  ).toBe(1);
-  expect((await pool.query('SELECT * FROM orders')).rowCount).toBe(1);
-  expect(
-    (await pool.query('SELECT * FROM checkout_idempotency_keys')).rowCount,
-  ).toBe(1);
-});
-
-test('same key ignores changed checkout payload and returns current status without writing', async () => {
-  const first = await checkout().set('Idempotency-Key', 'first-wins');
-  await webhook(first.body.id, 'paid-first-wins');
-  const snapshot = await store.get(first.body.id);
-  const retried = await checkout({
-    ...payload,
-    businessOrderReference: 'ignored-order',
-    amountMinor: '2000',
-    currency: 'USD',
-  }).set('Idempotency-Key', 'first-wins');
-  expect(retried.status).toBe(200);
-  expect(retried.body).toEqual(JSON.parse(JSON.stringify(snapshot)));
-  expect((await pool.query('SELECT * FROM orders')).rowCount).toBe(1);
-  expect(
-    (await pool.query('SELECT * FROM checkout_idempotency_keys')).rowCount,
-  ).toBe(1);
-});
-
-test('different keys can bind to the same matching business order', async () => {
-  const first = await checkout().set('Idempotency-Key', 'first-alias');
-  const second = await checkout().set('Idempotency-Key', 'second-alias');
-  expect(first.status).toBe(201);
-  expect(second.status).toBe(200);
-  expect(second.body.id).toBe(first.body.id);
-  expect((await pool.query('SELECT * FROM orders')).rowCount).toBe(1);
-  expect(
-    (await pool.query('SELECT * FROM checkout_idempotency_keys')).rowCount,
-  ).toBe(2);
-});
-
-test('business-reference conflicts do not consume new idempotency keys', async () => {
-  await checkout();
-  expect(
-    (
-      await checkout({ ...payload, amountMinor: '2000' }).set(
-        'Idempotency-Key',
-        'retryable-key',
-      )
-    ).status,
-  ).toBe(409);
-  expect(
-    (await pool.query('SELECT * FROM checkout_idempotency_keys')).rowCount,
-  ).toBe(0);
-  const retried = await checkout({
-    ...payload,
-    businessOrderReference: 'corrected-request',
-  }).set('Idempotency-Key', 'retryable-key');
-  expect(retried.status).toBe(201);
-  expect(retried.body.businessOrderReference).toBe('corrected-request');
-});
-
-test('failed key persistence rolls back order creation and permits identical retry', async () => {
-  await pool.query(
-    `CREATE FUNCTION reject_test_key() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Injected key failure'; END; $$`,
-  );
-  await pool.query(
-    'CREATE TRIGGER reject_test_key BEFORE INSERT ON checkout_idempotency_keys FOR EACH ROW EXECUTE FUNCTION reject_test_key()',
-  );
-  const log = jest.spyOn(console, 'error').mockImplementation(() => {});
-  try {
-    expect((await checkout().set('Idempotency-Key', 'failed-key')).status).toBe(
-      503,
-    );
-    expect((await pool.query('SELECT * FROM orders')).rowCount).toBe(0);
-    expect(
-      (await pool.query('SELECT * FROM checkout_idempotency_keys')).rowCount,
-    ).toBe(0);
-  } finally {
-    await pool.query(
-      'DROP TRIGGER reject_test_key ON checkout_idempotency_keys',
-    );
-    await pool.query('DROP FUNCTION reject_test_key()');
-    log.mockRestore();
-  }
-  expect((await checkout().set('Idempotency-Key', 'failed-key')).status).toBe(
-    201,
-  );
 });
 
 test('Unicode scalar values including supplementary characters round-trip through PostgreSQL', async () => {

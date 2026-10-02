@@ -90,20 +90,43 @@ test.each([
   },
 );
 
-test('a business order reference is unique across the whole service, whoever submits it', async () => {
-  const first = await fixture.checkout().set('Idempotency-Key', 'caller-a');
-  const matching = await fixture.checkout().set('Idempotency-Key', 'caller-b');
-  const changed = await fixture
-    .checkout({ ...validCheckout, amountMinor: '2000' })
-    .set('Idempotency-Key', 'caller-c');
-  const unkeyed = await fixture.checkout({ ...validCheckout, currency: 'USD' });
+test('a business order reference is unique across the whole service', async () => {
+  const first = await fixture.checkout();
+  const matching = await fixture.checkout();
+  const changedAmount = await fixture.checkout({
+    ...validCheckout,
+    amountMinor: '2000',
+  });
+  const changedCurrency = await fixture.checkout({
+    ...validCheckout,
+    currency: 'USD',
+  });
   expect(first.status).toBe(201);
   expect(matching.status).toBe(200);
   expect(matching.body.id).toBe(first.body.id);
-  expect(changed.status).toBe(409);
-  expect(unkeyed.status).toBe(409);
+  expect(changedAmount.status).toBe(409);
+  expect(changedCurrency.status).toBe(409);
   expect(await fixture.count('orders')).toBe(1);
   expect((await fixture.order(first.body.id)).body).toEqual(first.body);
+});
+
+test('an Idempotency-Key header has no effect: retries are recognised by the business reference alone', async () => {
+  const first = await fixture.checkout().set('Idempotency-Key', 'key-1');
+  const changedWithSameKey = await fixture
+    .checkout({ ...validCheckout, amountMinor: '2000' })
+    .set('Idempotency-Key', 'key-1');
+  const matchingWithOtherKey = await fixture
+    .checkout()
+    .set('Idempotency-Key', 'key-2');
+  const malformedKey = await fixture
+    .checkout({ ...validCheckout, businessOrderReference: 'other' })
+    .set('Idempotency-Key', 'k'.repeat(129));
+  expect(first.status).toBe(201);
+  expect(changedWithSameKey.status).toBe(409);
+  expect(matchingWithOtherKey.status).toBe(200);
+  expect(matchingWithOtherKey.body.id).toBe(first.body.id);
+  expect(malformedKey.status).toBe(201);
+  expect(await fixture.count('orders')).toBe(2);
 });
 
 const transitions: [string, string[], string][] = [

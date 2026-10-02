@@ -19,9 +19,9 @@ afterAll(async () => {
   await Promise.all(openFixtures.map((fixture) => fixture.close()));
 });
 
-test('orders, keys and events survive a service restart', async () => {
+test('orders and events survive a service restart', async () => {
   const before = open();
-  const created = await before.checkout().set('Idempotency-Key', 'durable');
+  const created = await before.checkout();
   await before.webhook(created.body.id, 'durable-event', 'failed');
   await before.close();
 
@@ -29,7 +29,7 @@ test('orders, keys and events survive a service restart', async () => {
   const read = await after.order(created.body.id);
   expect(read.status).toBe(200);
   expect(read.body).toMatchObject({ id: created.body.id, status: 'failed' });
-  const replay = await after.checkout().set('Idempotency-Key', 'durable');
+  const replay = await after.checkout();
   expect(replay.status).toBe(200);
   expect(replay.body.id).toBe(created.body.id);
   const redelivery = await after.webhook(
@@ -63,9 +63,7 @@ test('concurrent submissions across two service instances still yield one order'
   const second = open();
   const responses = await Promise.all(
     Array.from({ length: 30 }, (_, index) =>
-      (index % 2 === 0 ? primary : second)
-        .checkout()
-        .set('Idempotency-Key', `cross-instance-${index % 3}`),
+      (index % 2 === 0 ? primary : second).checkout(),
     ),
   );
   expect(responses.filter((response) => response.status === 201)).toHaveLength(
@@ -141,7 +139,7 @@ test('provider webhooks keep committing while private capacity is exhausted', as
   expect(spec.status).toBe(200);
 });
 
-test('retrying a rejected submission after the window creates it exactly once', async () => {
+test('a checkout rejected by the rate limit succeeds once on retry after the window', async () => {
   let now = 0;
   const limited = open({
     rateLimitMax: 1,
@@ -149,13 +147,13 @@ test('retrying a rejected submission after the window creates it exactly once', 
     now: () => Milliseconds.parse(now),
   });
   await limited.place('filler');
-  const rejected = await limited.checkout().set('Idempotency-Key', 'retry-me');
+  const rejected = await limited.checkout();
   expect(rejected.status).toBe(429);
   now += 1000;
-  const first = await limited.checkout().set('Idempotency-Key', 'retry-me');
+  const first = await limited.checkout();
   expect(first.status).toBe(201);
   now += 1000;
-  const replay = await limited.checkout().set('Idempotency-Key', 'retry-me');
+  const replay = await limited.checkout();
   expect(replay.status).toBe(200);
   expect(replay.body.id).toBe(first.body.id);
   expect(await limited.count('orders')).toBe(2);

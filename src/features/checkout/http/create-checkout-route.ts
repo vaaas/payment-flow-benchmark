@@ -12,10 +12,7 @@ export class CreateCheckoutRoute {
   constructor(private readonly bus: Bus) {}
 
   public readonly handle: RequestHandler = async (request, response) => {
-    const command = CreateCheckout.from(
-      request.body,
-      request.get('Idempotency-Key'),
-    );
+    const command = CreateCheckout.from(request.body);
     const result = await this.bus.dispatch(command);
     response
       .status(result.created ? HttpStatus.created : HttpStatus.ok)

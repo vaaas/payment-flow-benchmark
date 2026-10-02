@@ -130,12 +130,10 @@ test('mixed checkouts, replays, payments and lookups complete without deadlock o
           index % 8 === 1 ? 'failed' : 'succeeded',
         );
       case 2:
-        return fixture
-          .checkout({
-            ...validCheckout,
-            businessOrderReference: `fresh-${index}`,
-          })
-          .set('Idempotency-Key', `mixed-key-${index % 10}`);
+        return fixture.checkout({
+          ...validCheckout,
+          businessOrderReference: `fresh-${index}`,
+        });
       default:
         return fixture.order(target.id);
     }
@@ -146,14 +144,7 @@ test('mixed checkouts, replays, payments and lookups complete without deadlock o
       .map((response) => response.status)
       .filter((status) => ![200, 201].includes(status)),
   ).toEqual([]);
-  const distinctKeys = new Set(
-    range(120)
-      .filter((index) => index % 4 === 2)
-      .map((index) => index % 10),
-  );
-  expect(await fixture.count('checkout_idempotency_keys')).toBe(
-    distinctKeys.size,
-  );
+  expect(await fixture.count('orders')).toBe(10 + 30);
 });
 
 test('replaying one event many times alongside new events keeps the event log exact', async () => {

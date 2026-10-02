@@ -2,7 +2,6 @@ import { Event } from '#src/application/event';
 import type { Order } from '#src/features/orders/domain/order';
 import { z } from 'zod';
 import { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
-import { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
 import { Amount } from '#src/shared/domain/amount';
 import { Currency } from '#src/shared/domain/currency';
 
@@ -21,19 +20,13 @@ export class CreateCheckout extends Event<CheckoutResult> {
     currency: Currency.schema,
   });
 
-  public static from(input: unknown, idempotencyKey?: unknown): CreateCheckout {
-    return new CreateCheckout(
-      CreateCheckout.schema.parse(input),
-      IdempotencyKey.schema.optional().parse(idempotencyKey),
-    );
+  public static from(input: unknown): CreateCheckout {
+    return new CreateCheckout(CreateCheckout.schema.parse(input));
   }
 
   public readonly payload: Checkout;
 
-  private constructor(
-    payload: Checkout,
-    public readonly idempotencyKey: IdempotencyKey | undefined,
-  ) {
+  private constructor(payload: Checkout) {
     super();
     this.payload = Object.freeze({ ...payload });
     Object.freeze(this);

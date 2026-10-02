@@ -26,13 +26,8 @@ export class CreateCheckoutHandler implements EventHandler<CreateCheckout> {
   ) {}
 
   public handle(event: CreateCheckout): Promise<CheckoutResult> {
-    const { payload, idempotencyKey } = event;
+    const { payload } = event;
     return this.store.transaction(async (session) => {
-      if (idempotencyKey !== undefined) {
-        await session.lockSubmission(idempotencyKey);
-        const replayed = await session.findBySubmission(idempotencyKey);
-        if (replayed) return { order: replayed, created: false };
-      }
       const placed = Order.place(payload, this.ids.next(), this.clock.now());
       const inserted = await session.insertIfAbsent(placed);
       const order = inserted
@@ -40,8 +35,6 @@ export class CreateCheckoutHandler implements EventHandler<CreateCheckout> {
         : await session.findByReference(payload.businessOrderReference);
       if (!order) throw new Error('Checkout order disappeared during creation');
       if (!order.matchesCheckout(payload)) throw new CheckoutConflict();
-      if (idempotencyKey !== undefined)
-        await session.bindSubmission(idempotencyKey, order.id);
       return { order, created: inserted };
     });
   }

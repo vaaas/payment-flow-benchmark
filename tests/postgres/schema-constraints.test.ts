@@ -24,9 +24,7 @@ beforeAll(async () => {
   await migrate(pool);
 });
 beforeEach(async () => {
-  await pool.query(
-    'TRUNCATE checkout_idempotency_keys, provider_events, orders',
-  );
+  await pool.query('TRUNCATE provider_events, orders');
 });
 afterAll(async () => {
   await administration.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
@@ -60,12 +58,6 @@ const insertEvent = (eventId: string, orderId: number, outcome = 'failed') =>
   pool.query(
     'INSERT INTO provider_events (event_id, order_id, outcome) VALUES ($1, $2, $3)',
     [eventId, orderId, outcome],
-  );
-
-const insertKey = (key: string, orderId: number) =>
-  pool.query(
-    'INSERT INTO checkout_idempotency_keys (key, order_id) VALUES ($1, $2)',
-    [key, orderId],
   );
 
 const unique = { code: '23505' };
@@ -140,31 +132,29 @@ test('event IDs are unique across orders, not per order', async () => {
   await expect(insertEvent('shared', second)).rejects.toMatchObject(unique);
 });
 
-test('provider events and idempotency keys must reference an existing order', async () => {
+test('provider events must reference an existing order', async () => {
   await expect(insertEvent('orphan', 987654)).rejects.toMatchObject(foreignKey);
-  await expect(insertKey('orphan-key', 987654)).rejects.toMatchObject(
-    foreignKey,
-  );
 });
 
-test('an order with events or keys cannot be deleted out from under them', async () => {
+test('an order with events cannot be deleted out from under them', async () => {
   const orderId = (await insertOrder()).rows[0].id;
   await insertEvent('evt-1', orderId);
   await expect(
     pool.query('DELETE FROM orders WHERE id = $1', [orderId]),
   ).rejects.toMatchObject(foreignKey);
-  await pool.query('DELETE FROM provider_events');
-  await insertKey('key-1', orderId);
-  await expect(
-    pool.query('DELETE FROM orders WHERE id = $1', [orderId]),
-  ).rejects.toMatchObject(foreignKey);
 });
 
-test('idempotency keys are unique and may share an order', async () => {
-  const orderId = (await insertOrder()).rows[0].id;
-  await insertKey('key-1', orderId);
-  await expect(insertKey('key-1', orderId)).rejects.toMatchObject(unique);
-  await expect(insertKey('key-2', orderId)).resolves.toBeDefined();
+test('the schema has no idempotency key table', async () => {
+  const tables = await pool.query(
+    `SELECT table_name FROM information_schema.tables
+     WHERE table_schema = $1 ORDER BY table_name`,
+    [schema],
+  );
+  expect(tables.rows.map((row) => row.table_name)).toEqual([
+    'orders',
+    'provider_events',
+    'schema_migrations',
+  ]);
 });
 
 test('text columns reject NUL characters', async () => {
@@ -189,5 +179,4 @@ test('uniqueness rules are backed by indexes', async () => {
   expect(mentions('orders', 'public_id')).toBe(true);
   expect(mentions('orders', 'business_order_reference')).toBe(true);
   expect(mentions('provider_events', 'event_id')).toBe(true);
-  expect(mentions('checkout_idempotency_keys', 'key')).toBe(true);
 });

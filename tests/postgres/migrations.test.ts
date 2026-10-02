@@ -39,7 +39,6 @@ test('fresh migrations are repeatable and leave integer primary keys without pol
     await database.query(`SELECT table_name, data_type FROM information_schema.columns
     WHERE table_schema='migration_test' AND column_name='id' ORDER BY table_name`);
   expect(keys.rows).toEqual([
-    { table_name: 'checkout_idempotency_keys', data_type: 'integer' },
     { table_name: 'orders', data_type: 'integer' },
     { table_name: 'provider_events', data_type: 'integer' },
     { table_name: 'schema_migrations', data_type: 'integer' },
@@ -61,7 +60,6 @@ test('concurrent migrations on a fresh database apply each version exactly once'
      WHERE table_schema = 'migration_test' ORDER BY table_name`,
   );
   expect(tables.rows.map((row) => row.table_name)).toEqual([
-    'checkout_idempotency_keys',
     'orders',
     'provider_events',
     'schema_migrations',
@@ -81,13 +79,13 @@ test('re-running migrations preserves existing data', async () => {
   expect(rows.rows).toEqual([{ business_order_reference: 'kept' }]);
 });
 
-test('migrations adopt a database whose versions are already recorded', async () => {
+test('migrations skip versions that are already recorded', async () => {
   await migrate(database);
-  await database.query('DROP TABLE checkout_idempotency_keys');
+  await database.query('DROP TABLE provider_events');
   await migrate(database);
   const tables = await database.query(
     `SELECT table_name FROM information_schema.tables
-     WHERE table_schema = 'migration_test' AND table_name = 'checkout_idempotency_keys'`,
+     WHERE table_schema = 'migration_test' AND table_name = 'provider_events'`,
   );
   expect(tables.rows).toEqual([]);
 });

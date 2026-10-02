@@ -96,7 +96,6 @@ test.each(rejectedFields)(
     expect(Array.isArray(response.body.details)).toBe(true);
     expect(response.body.details.length).toBeGreaterThan(0);
     expect(await fixture.count('orders')).toBe(0);
-    expect(await fixture.count('checkout_idempotency_keys')).toBe(0);
   },
 );
 

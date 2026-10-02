@@ -1,5 +1,4 @@
 import { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
-import { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
 import {
   OrderId,
   OrderIdGenerator,
@@ -8,7 +7,6 @@ import { ProviderEventId } from '#src/features/payments/domain/provider-event-id
 
 const textIdentifiers = [
   ['BusinessOrderReference', BusinessOrderReference],
-  ['IdempotencyKey', IdempotencyKey],
   ['ProviderEventId', ProviderEventId],
 ] as const;
 

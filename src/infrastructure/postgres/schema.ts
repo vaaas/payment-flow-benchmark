@@ -8,7 +8,6 @@ import {
   integer,
 } from 'drizzle-orm/pg-core';
 import type { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
-import type { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
 import type { OrderId } from '#src/features/orders/domain/order-id';
 import type { CurrencyCode } from '#src/shared/domain/currency-code';
 import type { PaymentStatus } from '#src/features/orders/domain/order';
@@ -37,17 +36,6 @@ export const providerEvents = pgTable('provider_events', {
     .notNull()
     .references(() => orders.id),
   outcome: text('outcome').$type<'failed' | 'succeeded'>().notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
-
-export const checkoutIdempotencyKeys = pgTable('checkout_idempotency_keys', {
-  id: serial('id').primaryKey(),
-  key: text('key').$type<IdempotencyKey>().notNull().unique(),
-  orderId: integer('order_id')
-    .notNull()
-    .references(() => orders.id),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

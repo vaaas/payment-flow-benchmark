@@ -16,10 +16,3 @@ CREATE TABLE provider_events (
   outcome text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
-CREATE TABLE checkout_idempotency_keys (
-  id serial PRIMARY KEY,
-  key text NOT NULL UNIQUE,
-  order_id integer NOT NULL REFERENCES orders(id),
-  created_at timestamptz NOT NULL DEFAULT now()
-);

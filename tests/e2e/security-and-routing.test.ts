@@ -83,12 +83,11 @@ test('unauthenticated callers cannot tell existing orders from missing ones', as
   );
 });
 
-test('a failed authentication on an idempotent retry never reveals the stored order', async () => {
-  await fixture.checkout().set('Idempotency-Key', 'secret-retry');
+test('a failed authentication on a retry never reveals the stored order', async () => {
+  await fixture.checkout();
   const response = await request(fixture.app)
     .post('/checkout-intents')
     .set('Authorization', 'Bearer wrong')
-    .set('Idempotency-Key', 'secret-retry')
     .send(validCheckout);
   expect(response.status).toBe(401);
   expect(response.body).toEqual({ error: 'Invalid or missing bearer API key' });

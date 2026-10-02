@@ -1,5 +1,4 @@
 import { Amount } from '#src/shared/domain/amount';
-import { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
 import { CreateCheckoutHandler } from '#src/features/checkout/application/create-checkout-handler';
 import { CheckoutConflict } from '#src/features/checkout/domain/checkout-conflict';
 import { CreateCheckout } from '#src/features/checkout/domain/create-checkout';
@@ -19,8 +18,8 @@ function setup() {
     stores.ids,
     stores.clock,
   );
-  const submit = (override: object = {}, key?: string) =>
-    handler.handle(CreateCheckout.from({ ...body, ...override }, key));
+  const submit = (override: object = {}) =>
+    handler.handle(CreateCheckout.from({ ...body, ...override }));
   return { stores, handler, submit };
 }
 
@@ -60,51 +59,6 @@ test.each([
   },
 );
 
-test('the first request for a key wins and later payloads are ignored', async () => {
-  const { stores, submit } = setup();
-  const first = await submit({}, 'key-1');
-  const replay = await submit(
-    { businessOrderReference: 'other', amountMinor: '5' },
-    'key-1',
-  );
-  expect(replay.created).toBe(false);
-  expect(replay.order).toBe(first.order);
-  expect(stores.data.orders.size).toBe(1);
-});
-
-test('different keys for a matching payload share one order', async () => {
-  const { stores, submit } = setup();
-  const first = await submit({}, 'key-1');
-  const second = await submit({}, 'key-2');
-  expect(second.created).toBe(false);
-  expect(second.order).toBe(first.order);
-  expect([...stores.data.submissions.keys()]).toEqual(['key-1', 'key-2']);
-});
-
-test('a key may bind to an order created without one', async () => {
-  const { stores, submit } = setup();
-  const first = await submit();
-  const keyed = await submit({}, 'late-key');
-  expect(keyed.order).toBe(first.order);
-  expect(stores.data.submissions.get(IdempotencyKey.parse('late-key'))).toBe(
-    first.order.id,
-  );
-});
-
-test('a conflicting request does not consume its key', async () => {
-  const { stores, submit } = setup();
-  await submit();
-  await expect(
-    submit({ amountMinor: '5' }, 'retry-key'),
-  ).rejects.toBeInstanceOf(CheckoutConflict);
-  expect(stores.data.submissions.size).toBe(0);
-  const corrected = await submit(
-    { businessOrderReference: 'fixed' },
-    'retry-key',
-  );
-  expect(corrected.created).toBe(true);
-});
-
 test('a failure after the order is inserted rolls the whole checkout back', async () => {
   const { stores } = setup();
   const failing: CheckoutStore = {
@@ -112,23 +66,23 @@ test('a failure after the order is inserted rolls the whole checkout back', asyn
       stores.checkout.transaction((session) =>
         work({
           ...session,
-          bindSubmission: async () => {
+          insertIfAbsent: async (order) => {
+            await session.insertIfAbsent(order);
             throw new Error('Injected failure');
           },
         }),
       ),
   };
   const handler = new CreateCheckoutHandler(failing, stores.ids, stores.clock);
-  await expect(
-    handler.handle(CreateCheckout.from(body, 'doomed')),
-  ).rejects.toThrow('Injected failure');
+  await expect(handler.handle(CreateCheckout.from(body))).rejects.toThrow(
+    'Injected failure',
+  );
   expect(stores.data.orders.size).toBe(0);
-  expect(stores.data.submissions.size).toBe(0);
   const retry = await new CreateCheckoutHandler(
     stores.checkout,
     stores.ids,
     stores.clock,
-  ).handle(CreateCheckout.from(body, 'doomed'));
+  ).handle(CreateCheckout.from(body));
   expect(retry.created).toBe(true);
 });
 

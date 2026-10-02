@@ -100,9 +100,7 @@ test('rejected requests do not extend the window and the budget resets at its bo
 test('a concurrent burst cannot exceed the private-route budget', async () => {
   const { checkout, stores } = fixture();
   const responses = await Promise.all(
-    Array.from({ length: 20 }, () =>
-      checkout().set('Idempotency-Key', 'repeated-submit'),
-    ),
+    Array.from({ length: 20 }, () => checkout()),
   );
   expect(responses.filter((response) => response.status === 201)).toHaveLength(
     2,

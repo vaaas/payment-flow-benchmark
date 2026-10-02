@@ -26,8 +26,7 @@ export type FixtureOptions = Readonly<{
   now?: () => Milliseconds;
 }>;
 
-export type StoredTable =
-  'orders' | 'provider_events' | 'checkout_idempotency_keys';
+export type StoredTable = 'orders' | 'provider_events';
 
 export function createFixture(options: FixtureOptions = {}) {
   const environment = Configuration.fromEnv();
@@ -57,8 +56,7 @@ export function createFixture(options: FixtureOptions = {}) {
   const authorization = `Bearer ${configuration.apiKey}`;
   let closing: Promise<void> | undefined;
 
-  const truncate = () =>
-    pool.query('TRUNCATE checkout_idempotency_keys, provider_events, orders');
+  const truncate = () => pool.query('TRUNCATE provider_events, orders');
   const checkout = (body: object = validCheckout) =>
     request(app)
       .post('/checkout-intents')

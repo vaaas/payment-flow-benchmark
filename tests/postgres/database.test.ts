@@ -206,7 +206,6 @@ test('connection termination inside a checkout transaction returns 503, releases
     request(app.http)
       .post('/checkout-intents')
       .set('Authorization', `Bearer ${configuration.apiKey}`)
-      .set('Idempotency-Key', 'terminated-checkout-key')
       .send(payload);
   try {
     expect((await checkout()).status).toBe(503);
@@ -215,14 +214,6 @@ test('connection termination inside a checkout transaction returns 503, releases
         await administration.query(
           'SELECT id FROM orders WHERE business_order_reference=$1',
           [payload.businessOrderReference],
-        )
-      ).rowCount,
-    ).toBe(0);
-    expect(
-      (
-        await administration.query(
-          'SELECT id FROM checkout_idempotency_keys WHERE key=$1',
-          ['terminated-checkout-key'],
         )
       ).rowCount,
     ).toBe(0);
