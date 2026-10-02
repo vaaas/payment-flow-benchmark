@@ -65,3 +65,21 @@ test('a checkout retry against an order with an unknown stored status is a proce
   });
   expect(response.status).toBe(503);
 });
+
+test.each(['ZZZ', 'eur', 'XXX', ''])(
+  'a stored order with the unknown currency %j is a processing failure, never served',
+  async (currency) => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const publicId = randomUUID();
+    await fixture.pool.query(
+      `INSERT INTO orders (public_id, business_order_reference, amount_minor, currency)
+       VALUES ($1, $2, 1999, $3)`,
+      [publicId, `stored-${publicId}`, currency],
+    );
+    const response = await fixture.order(publicId);
+    expect(response.status).toBe(503);
+    expect(JSON.stringify(response.body)).not.toContain(
+      currency || 'unreachable',
+    );
+  },
+);

@@ -4,6 +4,7 @@ import type { Container } from '#src/application/dependency-injection/container'
 import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { Currency } from '#src/shared/domain/currency';
 import type { Checkout } from '#src/features/checkout/domain/create-checkout';
 import { CheckoutConflict } from '#src/features/checkout/domain/checkout-conflict';
 import { Order, paymentStatusSchema } from '#src/features/orders/domain/order';
@@ -23,7 +24,7 @@ const toOrder = (row: typeof orders.$inferSelect): Order => {
   return new Order({
     id: row.publicId,
     businessOrderReference: row.businessOrderReference,
-    currency: row.currency,
+    currency: Currency.of(row.currency),
     status: status.data,
     amountMinor: row.amountMinor.toString(),
     createdAt: row.createdAt.toISOString(),
@@ -55,7 +56,8 @@ export class PostgresOrderStore implements OrderStore {
         const inserted = await tx
           .insert(orders)
           .values({
-            ...payload,
+            businessOrderReference: payload.businessOrderReference,
+            currency: payload.currency.code,
             publicId: randomUUID(),
             amountMinor: BigInt(payload.amountMinor),
           })

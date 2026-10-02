@@ -1,3 +1,4 @@
+import { Currency } from '#src/shared/domain/currency';
 import { Configuration } from '#src/configuration/configuration';
 import request from 'supertest';
 import { Bus } from '#src/application/bus';
@@ -16,6 +17,7 @@ test('one feature installation wires its dependencies, events and routes without
   };
   const order = new Order({
     ...payload,
+    currency: Currency.of(payload.currency),
     id: '11111111-1111-4111-8111-111111111111',
     status: 'pending',
     createdAt: '2026-10-01T10:00:00.000Z',
@@ -48,7 +50,10 @@ test('one feature installation wires its dependencies, events and routes without
     .send(payload);
   expect(response.status).toBe(201);
   expect(response.body.id).toBe(order.id);
-  expect(store.create).toHaveBeenCalledWith(payload, undefined);
+  expect(store.create).toHaveBeenCalledWith(
+    { ...payload, currency: Currency.of(payload.currency) },
+    undefined,
+  );
   expect(
     (
       await request(app.http)

@@ -285,7 +285,7 @@ test('same key ignores changed checkout payload and returns current status witho
     currency: 'USD',
   }).set('Idempotency-Key', 'first-wins');
   expect(retried.status).toBe(200);
-  expect(retried.body).toEqual({ ...snapshot });
+  expect(retried.body).toEqual(JSON.parse(JSON.stringify(snapshot)));
   expect((await pool.query('SELECT * FROM orders')).rowCount).toBe(1);
   expect(
     (await pool.query('SELECT * FROM checkout_idempotency_keys')).rowCount,

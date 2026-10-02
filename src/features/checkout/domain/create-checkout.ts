@@ -1,12 +1,13 @@
 import { Event } from '#src/application/event';
 import type { OrderStore } from '#src/features/orders/domain/order-store';
 import { z } from 'zod';
+import { Currency } from '#src/shared/domain/currency';
 import { identifierSchema } from '#src/shared/domain/identifier-schema';
 
 export type Checkout = Readonly<{
   businessOrderReference: string;
   amountMinor: string;
-  currency: string;
+  currency: Currency;
 }>;
 
 export class CreateCheckout extends Event<
@@ -20,7 +21,7 @@ export class CreateCheckout extends Event<
       .pipe(
         z.string().refine((value) => BigInt(value) <= 9223372036854775807n),
       ),
-    currency: z.string().regex(/^[A-Z]{3}$/),
+    currency: Currency.schema,
   });
 
   public static from(input: unknown, idempotencyKey?: unknown): CreateCheckout {

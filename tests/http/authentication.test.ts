@@ -1,3 +1,4 @@
+import { Currency } from '#src/shared/domain/currency';
 import request from 'supertest';
 import { Container } from '#src/application/dependency-injection/container';
 import { installFeatures } from '#src/bootstrap/install-features';
@@ -13,6 +14,7 @@ const payload = {
 };
 const order = new Order({
   ...payload,
+  currency: Currency.of(payload.currency),
   id: '11111111-1111-4111-8111-111111111111',
   status: 'pending',
   createdAt: '2026-10-01T10:00:00.000Z',

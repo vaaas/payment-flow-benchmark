@@ -1,3 +1,4 @@
+import { Currency } from '#src/shared/domain/currency';
 import { Configuration } from '#src/configuration/configuration';
 import { installFeatures } from '#src/bootstrap/install-features';
 import { Container } from '#src/application/dependency-injection/container';
@@ -100,6 +101,7 @@ const checkoutPayload = {
 };
 const order = new Order({
   ...checkoutPayload,
+  currency: Currency.of(checkoutPayload.currency),
   id: '11111111-1111-4111-8111-111111111111',
   status: 'pending',
   createdAt: '2026-10-01T10:00:00.000Z',
@@ -116,15 +118,18 @@ test('checkout route dispatches a parsed immutable domain command', async () => 
     .send(checkoutPayload);
 
   expect(response.status).toBe(201);
-  expect(response.body).toEqual({ ...order });
+  expect(response.body).toEqual(JSON.parse(JSON.stringify(order)));
   expect(dispatch).toHaveBeenCalledWith(expect.any(CreateCheckout));
   const command = dispatch.mock.calls[0]?.[0];
   if (!(command instanceof CreateCheckout))
     throw new Error('Expected CreateCheckout');
-  expect(command.payload).toEqual(checkoutPayload);
+  expect(command.payload).toEqual({
+    ...checkoutPayload,
+    currency: Currency.of(checkoutPayload.currency),
+  });
   expect(command.idempotencyKey).toBe('checkout-submission');
   expect(store.create).toHaveBeenCalledWith(
-    checkoutPayload,
+    { ...checkoutPayload, currency: Currency.of(checkoutPayload.currency) },
     'checkout-submission',
   );
   expect(Object.isFrozen(command)).toBe(true);
@@ -156,7 +161,7 @@ test('order route dispatches a parsed immutable domain query', async () => {
     .set('Authorization', `Bearer ${configuration.apiKey}`);
 
   expect(response.status).toBe(200);
-  expect(response.body).toEqual({ ...order });
+  expect(response.body).toEqual(JSON.parse(JSON.stringify(order)));
   expect(dispatch).toHaveBeenCalledWith(expect.any(GetOrder));
   const query = dispatch.mock.calls[0]?.[0];
   if (!(query instanceof GetOrder)) throw new Error('Expected GetOrder');

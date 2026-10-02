@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Currency } from '#src/shared/domain/currency';
 import type { Checkout } from '#src/features/checkout/domain/create-checkout';
 import type { PaymentOutcome } from '#src/features/payments/domain/receive-webhook';
 
@@ -18,7 +19,7 @@ export class Order implements OrderSnapshot {
   public readonly id: string;
   public readonly businessOrderReference: string;
   public readonly amountMinor: string;
-  public readonly currency: string;
+  public readonly currency: Currency;
   public readonly status: PaymentStatus;
   public readonly createdAt: string;
   public readonly updatedAt: string;
@@ -38,7 +39,7 @@ export class Order implements OrderSnapshot {
     return (
       this.businessOrderReference === checkout.businessOrderReference &&
       this.amountMinor === checkout.amountMinor &&
-      this.currency === checkout.currency
+      this.currency.equals(checkout.currency)
     );
   }
 

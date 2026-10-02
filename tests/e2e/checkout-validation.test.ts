@@ -75,6 +75,11 @@ const rejectedFields: [string, Record<string, unknown>][] = [
   ['padded currency', { ...validCheckout, currency: 'EUR ' }],
   ['empty currency', { ...validCheckout, currency: '' }],
   ['symbol currency', { ...validCheckout, currency: '€€€' }],
+  ['well-formed but unknown currency', { ...validCheckout, currency: 'ZZZ' }],
+  ['no-currency code', { ...validCheckout, currency: 'XXX' }],
+  ['testing code', { ...validCheckout, currency: 'XTS' }],
+  ['precious metal', { ...validCheckout, currency: 'XAU' }],
+  ['special drawing right', { ...validCheckout, currency: 'XDR' }],
   ['numeric currency', { ...validCheckout, currency: 978 }],
   ['null currency', { ...validCheckout, currency: null }],
   ['unknown field', { ...validCheckout, note: 'extra' }],
@@ -275,8 +280,10 @@ test.each([
   ['reference with zero-width joiner', { businessOrderReference: 'a‍b' }],
   ['smallest amount', { amountMinor: '1' }],
   ['amount with nineteen digits', { amountMinor: '1000000000000000000' }],
-  ['unassigned but well-formed currency', { currency: 'XXX' }],
-  ['uncommon currency', { currency: 'ZZZ' }],
+  ['a zero-decimal currency', { currency: 'JPY' }],
+  ['a three-decimal currency', { currency: 'BHD' }],
+  ['a four-decimal currency', { currency: 'CLF' }],
+  ['a CFA franc', { currency: 'XOF' }],
 ])('accepts %s and returns it unchanged', async (_name, override) => {
   const body = { ...validCheckout, ...override };
   const response = await fixture.checkout(body);
