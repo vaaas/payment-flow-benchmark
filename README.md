@@ -158,3 +158,34 @@ Checkouts insert-on-conflict and perform payload comparison in one transaction. 
 Each webhook locks its order with `SELECT FOR UPDATE`, inserts its event using the unique event ID, compares payload on conflict, and updates status in the same transaction. Locking before insertion also avoids foreign-key deadlocks between events on one order.
 
 Different orders can process concurrently. An event ID reused for another existing order or outcome is rejected, never reapplied. The immutable `Order` chooses status changes in the application while its row is locked. The payment session updates only status and `updatedAt`; checkout fields have no update operation. The database enforces uniqueness, foreign keys, and non-null columns only. Value rules (lengths, amount range, currency format, outcomes) live in the request parsers, and stored statuses are parsed again when read. There are no `CHECK` constraints and no transition trigger.
+
+## Commentary
+
+The scope of this project is tiny so arguably the architectural patterns enforced on it make it *more* difficult to reason about it. Merging everything into a single file for such a tiny project is definitely the way I would go. These patterns are more relevant as a proof-of-concept for a potentially much larger feature with lots of integrations (different ports, different ways to pay, different ways to notify).
+
+This architecture was applied anyway as a sample of what I'm looking for while making software.
+
+## AI use disclosure
+
+Various LLMs were used during the implementation of this repository, but primarily Opus 5.5, Sonnet 5.5, and GPT6-Sol. The overwhelming majority of code is LLM-generated. LLMs were directed to make corrections and ensure consistent standards instead of editing code by hand.
+
+Here is a rough summary of how LLMs were used:
+
+- they were instructed in how to scaffold this project
+- they were given our initial requirements and definitions of done for an initial implementation
+- this implementation was gradually refined, in a "just-in-time" manner; an issue was found, we refined it, we moved on to the next issue
+- formatting was applied; initial implementation was almost unreadable
+- enforcing of some of our coding standards via eslint (can be more thorough)
+- architecture: initial implementation was 5 large buckets, project was completely re-architected, drawing from domain-driven design principles
+- I identified object/service creation as an issue, so we added a dependency injection container with autowiring support
+- database was converted to a dumb store, with checks moving to the application rather than the database, keeping uniqueness, types, or foreign key constraints
+- also: LLMs are heavily biased towards UUIDs, which hurt performance; they were redirected to serial keys for internal references
+- I thought my idea for an idempotency key was cool, and then I realised it duplicates existing functionality so I removed it
+- the postgres store ended up being a god object so it was split apart
+- even with autowiring, feature registration was annoying so we added dedicated `install` methods on the container or the `App` so that the central scaffolding is nice and clean
+- `provider_events` screamed "event-sourcing" to me so we applied some event-sourcing patterns (primarily the reducer)
+- order state transitions were recorded as data in the domain layer, and applied via methods on the domain objects
+- correctness was manually verified as guaranteed primarily via a) reasoning through the sensitive code (under payments) and the following tests: `order-lifecycle.test.ts`, `payment-flow.test.ts`
+- for additional peace-of-mind, beyond my ability to reason around concurrency, several rounds of adversarial reviewers were used to refine the implementation and enrich tests
+- automated mutation testing was added to ensure that our tests are capable of failing; AI was used to kill the mutants up to an acceptable degree (25% or less survival rate)
+- I noticed we use `string` too much, so newtypes were introduced to avoid passing the wrong data to the wrong place just because they are all `string`
