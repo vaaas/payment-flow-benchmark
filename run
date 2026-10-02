@@ -51,6 +51,12 @@ run_tests() {
   test_compose run --rm -T tests
 }
 
+run_mutation() {
+  mkdir -p reports
+  test_compose build mutation
+  test_compose run --rm -T mutation npx stryker run "$@"
+}
+
 run_npm() {
   compose --profile tools build tooling
   compose --profile tools run --rm -T --no-deps tooling npm ci --no-audit --no-fund
@@ -66,7 +72,7 @@ stop_services() {
 }
 
 show_usage() {
-  echo 'Usage: ./run [dev|test|build|format|format:check|npm ...|stop]'
+  echo 'Usage: ./run [dev|test|mutate|build|format|format:check|npm ...|stop]'
 }
 
 container_engine=$(select_container_engine)
@@ -77,6 +83,10 @@ case "${1:-dev}" in
     ;;
   test)
     run_tests
+    ;;
+  mutate)
+    shift
+    run_mutation "$@"
     ;;
   build)
     compose build api

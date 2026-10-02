@@ -4,7 +4,9 @@ x-podman:
   in_pod: false
 
 x-application: &application
-  build: .
+  build:
+    context: .
+    target: application
   image: payment-flow-benchmark-app
 
 services:
@@ -63,6 +65,24 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:benchmark@test-database:5432/checkout_test
       RATE_LIMIT_MAX: 10000
+    depends_on:
+      test-database:
+        condition: service_healthy
+
+  mutation:
+    <<: *application
+    build:
+      context: .
+      target: mutation
+    image: payment-flow-benchmark-mutation
+    profiles: [test]
+    command: [npx, stryker, run]
+    environment:
+      DATABASE_URL: postgresql://postgres:benchmark@test-database:5432/checkout_test
+      RATE_LIMIT_MAX: 10000
+      NODE_OPTIONS: --unhandled-rejections=warn
+    volumes:
+      - ./reports:/app/reports
     depends_on:
       test-database:
         condition: service_healthy

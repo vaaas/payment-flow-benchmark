@@ -11,11 +11,16 @@ Host does not need node.js, psql, or dev tooling; workloads exist entirely in co
 
 - `./run dev`: start the dev server at `http://localhost:3000`
 - `./run test`: compile and run the test suite
+- `./run mutate`: run mutation tests with Stryker. Manual only: it is not part of `./run test` or any build, and takes about 30 minutes. Extra arguments go to `stryker run`, e.g. `./run mutate --mutate src/shared/domain/amount.ts`
 - `./run format`: apply `prettier` formatting
 - `./run format:check`: read-only formatting check
 - `./run npm ...`: forward arguments to npm inside the container, e.g. `./run npm i`
 - `./run build`: build the application image.
 - `./run stop`: remove service containers and networks
+
+### Mutation testing
+
+`./run mutate` mutates the code under `src/` (except `main.ts`) and re-runs the test suite against each mutant, to check that the tests can fail. It runs serially against the test database in a separate image that adds `procps`, which Stryker needs to stop hung mutants. Mutants that do not compile are discarded by the TypeScript checker. The reports are written to `reports/` (git-ignored): an HTML report at `reports/mutation/index.html`, plus `reports/stryker-incremental.json`, which lets a later run re-test only what changed. The run fails below a 75% mutation score, so at most 25% of mutants may survive. The latest full run scored 89%; the survivors are mostly constant error messages and unused type-tag strings.
 
 ## Architecture
 
