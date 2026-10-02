@@ -8,6 +8,7 @@ import { Configuration } from '#src/configuration/configuration';
 import { App } from '#src/http/app';
 import { RateLimiter } from '#src/http/rate-limiting/rate-limiter';
 import { Database } from '#src/infrastructure/postgres/database';
+import type { Milliseconds } from '#src/shared/domain/milliseconds';
 import { migrate } from '#src/infrastructure/postgres/migrate';
 import { installPostgresStores } from '#src/bootstrap/install-postgres-stores';
 
@@ -22,7 +23,7 @@ export type FixtureOptions = Readonly<{
   schema?: string;
   rateLimitMax?: number;
   rateLimitWindowMs?: number;
-  now?: () => number;
+  now?: () => Milliseconds;
 }>;
 
 export type StoredTable =

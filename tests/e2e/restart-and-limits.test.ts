@@ -1,5 +1,6 @@
 import { connect } from 'node:net';
 import request from 'supertest';
+import { Milliseconds } from '#src/shared/domain/milliseconds';
 import { createFixture, validCheckout } from '#tests/support/e2e-fixture';
 import type { Fixture } from '#tests/support/e2e-fixture';
 
@@ -91,7 +92,7 @@ test('requests rejected by the rate limit never reach the database', async () =>
   const limited = open({
     rateLimitMax: 2,
     rateLimitWindowMs: 10000,
-    now: () => now,
+    now: () => Milliseconds.parse(now),
   });
   await limited.place('allowed-1');
   await limited.place('allowed-2');
@@ -119,7 +120,7 @@ test('Retry-After counts down as the window elapses', async () => {
   const limited = open({
     rateLimitMax: 1,
     rateLimitWindowMs: 10000,
-    now: () => now,
+    now: () => Milliseconds.parse(now),
   });
   await limited.place();
   const early = await limited.order('00000000-0000-4000-8000-000000000000');
@@ -145,7 +146,7 @@ test('retrying a rejected submission after the window creates it exactly once', 
   const limited = open({
     rateLimitMax: 1,
     rateLimitWindowMs: 1000,
-    now: () => now,
+    now: () => Milliseconds.parse(now),
   });
   await limited.place('filler');
   const rejected = await limited.checkout().set('Idempotency-Key', 'retry-me');

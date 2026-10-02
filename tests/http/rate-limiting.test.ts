@@ -1,6 +1,7 @@
 import { Timestamp } from '#src/shared/domain/timestamp';
 import { Amount } from '#src/shared/domain/amount';
 import { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
+import { Milliseconds } from '#src/shared/domain/milliseconds';
 import { OrderId } from '#src/features/orders/domain/order-id';
 import { Currency } from '#src/shared/domain/currency';
 import request from 'supertest';
@@ -45,7 +46,10 @@ function fixture() {
   const container = new Container()
     .registerInstance(Configuration, configuration)
     .install(stores.install)
-    .registerInstance(RateLimiter, new RateLimiter(configuration, () => now));
+    .registerInstance(
+      RateLimiter,
+      new RateLimiter(configuration, () => Milliseconds.parse(now)),
+    );
   const app = container.get(App).install(installFeatures).http;
   const authorization = `Bearer ${configuration.apiKey}`;
   return {

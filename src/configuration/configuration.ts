@@ -1,11 +1,14 @@
 import type { Container } from '#src/application/dependency-injection/container';
 import { z } from 'zod';
+import { ApiKey } from '#src/configuration/api-key';
+import { DatabaseUrl } from '#src/configuration/database-url';
+import { RequestLimit } from '#src/configuration/request-limit';
+import { Milliseconds } from '#src/shared/domain/milliseconds';
 
 const positiveInteger = z
   .string()
   .regex(/^[1-9][0-9]*$/)
-  .transform(Number)
-  .pipe(z.number().int().positive());
+  .transform(Number);
 
 export class Configuration {
   public static provide(_container: Container): Configuration {
@@ -13,18 +16,14 @@ export class Configuration {
   }
 
   private static readonly schema = z.object({
-    RATE_LIMIT_MAX: positiveInteger.default(100),
-    RATE_LIMIT_WINDOW_MS: positiveInteger.default(60000),
-    API_KEY: z.string().regex(/^\S+$/).default('benchmark-api-key'),
-    DATABASE_URL: z
-      .string()
-      .url()
-      .pipe(
-        z.string().refine((value) => {
-          const protocol = new URL(value).protocol;
-          return protocol === 'postgres:' || protocol === 'postgresql:';
-        }, 'DATABASE_URL must use a PostgreSQL URL'),
-      ),
+    RATE_LIMIT_MAX: positiveInteger
+      .pipe(RequestLimit.schema)
+      .default(RequestLimit.parse(100)),
+    RATE_LIMIT_WINDOW_MS: positiveInteger
+      .pipe(Milliseconds.schema)
+      .default(Milliseconds.parse(60000)),
+    API_KEY: ApiKey.schema.default(ApiKey.parse('benchmark-api-key')),
+    DATABASE_URL: DatabaseUrl.schema,
   });
 
   public static fromEnv(env: NodeJS.ProcessEnv = process.env): Configuration {
@@ -38,10 +37,10 @@ export class Configuration {
   }
 
   private constructor(
-    public readonly databaseUrl: string,
-    public readonly apiKey: string,
-    public readonly rateLimitMax: number,
-    public readonly rateLimitWindowMs: number,
+    public readonly databaseUrl: DatabaseUrl,
+    public readonly apiKey: ApiKey,
+    public readonly rateLimitMax: RequestLimit,
+    public readonly rateLimitWindowMs: Milliseconds,
   ) {
     Object.freeze(this);
   }
