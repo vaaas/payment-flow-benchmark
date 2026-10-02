@@ -1,3 +1,4 @@
+import { HttpStatus } from '#src/shared/response/http-status';
 import type {
   ErrorResponse,
   IRespondable,
@@ -9,6 +10,6 @@ export class CheckoutConflict extends Error implements IRespondable {
   }
 
   public response(): ErrorResponse {
-    return { status: 409, body: { error: this.message } };
+    return { status: HttpStatus.conflict, body: { error: this.message } };
   }
 }

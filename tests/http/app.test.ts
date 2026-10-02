@@ -1,3 +1,4 @@
+import { HttpStatus } from '#src/shared/response/http-status';
 import { Timestamp } from '#src/shared/domain/timestamp';
 import { Amount } from '#src/shared/domain/amount';
 import { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
@@ -207,7 +208,7 @@ test('middleware accepts an unknown error implementing IRespondable', async () =
   class RateLimited extends Error implements IRespondable {
     response(): ErrorResponse {
       return {
-        status: 429,
+        status: HttpStatus.tooManyRequests,
         body: { error: 'Try again later', details: { retryAfter: 5 } },
       };
     }

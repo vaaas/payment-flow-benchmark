@@ -1,3 +1,4 @@
+import type { HttpStatus } from '#src/shared/response/http-status';
 import type {
   ErrorResponse,
   IRespondable,
@@ -5,7 +6,7 @@ import type {
 
 export class HttpError extends Error implements IRespondable {
   constructor(
-    private readonly status: number,
+    private readonly status: HttpStatus,
     message: string,
     private readonly details?: unknown,
   ) {

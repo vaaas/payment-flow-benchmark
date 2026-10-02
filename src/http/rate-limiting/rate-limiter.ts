@@ -2,6 +2,7 @@ import type { RequestHandler } from 'express';
 import type { Container } from '#src/application/dependency-injection/container';
 import { Configuration } from '#src/configuration/configuration';
 import { Milliseconds } from '#src/shared/domain/milliseconds';
+import { HttpStatus } from '#src/shared/response/http-status';
 import { HttpError } from '#src/http/errors/http-error';
 
 export class RateLimiter {
@@ -34,7 +35,7 @@ export class RateLimiter {
           Math.ceil(Milliseconds.minus(this.windowEndsAt, now) / 1000),
         ),
       );
-      next(new HttpError(429, 'Too many requests; retry later'));
+      next(new HttpError(HttpStatus.tooManyRequests, 'Too many requests; retry later'));
       return;
     }
     this.requests++;

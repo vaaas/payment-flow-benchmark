@@ -1,5 +1,6 @@
 import type { ErrorRequestHandler } from 'express';
 import { z } from 'zod';
+import { HttpStatus } from '#src/shared/response/http-status';
 import { HttpError } from '#src/http/errors/http-error';
 import { isRespondable } from '#src/shared/response/i-respondable';
 import type { IRespondable } from '#src/shared/response/i-respondable';
@@ -28,16 +29,22 @@ export class ErrorHandler {
   private respondable(error: unknown): IRespondable {
     if (isRespondable(error)) return error;
     if (error instanceof z.ZodError) {
-      return new HttpError(400, 'Invalid request', error.issues);
+      return new HttpError(HttpStatus.badRequest, 'Invalid request', error.issues);
     }
     if (error instanceof URIError) {
-      return new HttpError(400, 'Invalid request');
+      return new HttpError(HttpStatus.badRequest, 'Invalid request');
     }
     if (this.isClientBodyError(error)) {
-      return new HttpError(error.status, 'Invalid JSON body');
+      return new HttpError(
+        HttpStatus.parse(error.status),
+        'Invalid JSON body',
+      );
     }
     console.error(error);
-    return new HttpError(503, 'Processing failed; retry the identical request');
+    return new HttpError(
+      HttpStatus.serviceUnavailable,
+      'Processing failed; retry the identical request',
+    );
   }
 
   private isClientBodyError(
@@ -45,7 +52,7 @@ export class ErrorHandler {
   ): error is { status: number; type?: string; expose?: boolean } {
     if (typeof error !== 'object' || error === null) return false;
     if (!('status' in error) || typeof error.status !== 'number') return false;
-    if (error.status < 400 || error.status >= 500) return false;
+    if (!HttpStatus.isClientError(error.status)) return false;
     const type = 'type' in error ? error.type : undefined;
     if (typeof type === 'string' && clientBodyErrorTypes.includes(type))
       return true;

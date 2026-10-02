@@ -1,5 +1,6 @@
 import type { Container } from '#src/application/dependency-injection/container';
 import type { RequestHandler } from 'express';
+import { HttpStatus } from '#src/shared/response/http-status';
 import { Bus } from '#src/application/bus';
 import { CreateCheckout } from '#src/features/checkout/domain/create-checkout';
 
@@ -16,6 +17,6 @@ export class CreateCheckoutRoute {
       request.get('Idempotency-Key'),
     );
     const result = await this.bus.dispatch(command);
-    response.status(result.created ? 201 : 200).json(result.order);
+    response.status(result.created ? HttpStatus.created : HttpStatus.ok).json(result.order);
   };
 }

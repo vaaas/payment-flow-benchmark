@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import type { RequestHandler } from 'express';
 import type { Container } from '#src/application/dependency-injection/container';
 import { Configuration } from '#src/configuration/configuration';
+import { HttpStatus } from '#src/shared/response/http-status';
 import { HttpError } from '#src/http/errors/http-error';
 
 export class BearerAuthentication {
@@ -27,6 +28,6 @@ export class BearerAuthentication {
       return;
     }
     response.set('WWW-Authenticate', 'Bearer');
-    next(new HttpError(401, 'Invalid or missing bearer API key'));
+    next(new HttpError(HttpStatus.unauthorized, 'Invalid or missing bearer API key'));
   };
 }

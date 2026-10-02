@@ -1,3 +1,4 @@
+import { HttpStatus } from '#src/shared/response/http-status';
 import type {
   ErrorResponse,
   IRespondable,
@@ -9,6 +10,6 @@ export class OrderNotFound extends Error implements IRespondable {
   }
 
   public response(): ErrorResponse {
-    return { status: 404, body: { error: this.message } };
+    return { status: HttpStatus.notFound, body: { error: this.message } };
   }
 }

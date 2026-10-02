@@ -1,5 +1,7 @@
+import type { HttpStatus } from '#src/shared/response/http-status';
+
 export type ErrorResponse = Readonly<{
-  status: number;
+  status: HttpStatus;
   body: Readonly<{ error: string; details?: unknown }>;
 }>;
 
