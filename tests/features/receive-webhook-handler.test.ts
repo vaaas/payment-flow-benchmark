@@ -1,3 +1,4 @@
+import type { OrderId } from '#src/features/orders/domain/order-id';
 import { CreateCheckoutHandler } from '#src/features/checkout/application/create-checkout-handler';
 import { CreateCheckout } from '#src/features/checkout/domain/create-checkout';
 import { OrderNotFound } from '#src/features/orders/domain/order-not-found';
@@ -27,7 +28,7 @@ async function setup() {
     outcome: string,
     orderId: string = order.id,
   ) => handler.handle(ReceiveWebhook.from({ eventId, orderId, outcome }));
-  const status = (id: string = order.id) => stores.data.orders.get(id)?.status;
+  const status = (id: OrderId = order.id) => stores.data.orders.get(id)?.status;
   return { stores, handler, order, place, receive, status };
 }
 

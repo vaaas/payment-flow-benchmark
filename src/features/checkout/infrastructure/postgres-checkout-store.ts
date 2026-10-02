@@ -5,7 +5,10 @@ import type {
   CheckoutSession,
   CheckoutStore,
 } from '#src/features/checkout/domain/checkout-store';
+import type { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
+import type { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
 import type { Checkout } from '#src/features/checkout/domain/create-checkout';
+import { OrderId } from '#src/features/orders/domain/order-id';
 import type { Order } from '#src/features/orders/domain/order';
 import { toOrder } from '#src/features/orders/infrastructure/order-mapper';
 import { Database } from '#src/infrastructure/postgres/database';
@@ -19,13 +22,13 @@ import type { PostgresTransaction } from '#src/infrastructure/postgres/with-data
 class PostgresCheckoutSession implements CheckoutSession {
   constructor(private readonly transaction: PostgresTransaction) {}
 
-  public async lockSubmission(key: string): Promise<void> {
+  public async lockSubmission(key: IdempotencyKey): Promise<void> {
     await this.transaction.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 1))`,
     );
   }
 
-  public async findBySubmission(key: string): Promise<Order | undefined> {
+  public async findBySubmission(key: IdempotencyKey): Promise<Order | undefined> {
     const [row] = await this.transaction
       .select({ order: orders })
       .from(checkoutIdempotencyKeys)
@@ -38,7 +41,7 @@ class PostgresCheckoutSession implements CheckoutSession {
     const [row] = await this.transaction
       .insert(orders)
       .values({
-        publicId: randomUUID(),
+        publicId: OrderId.parse(randomUUID()),
         businessOrderReference: checkout.businessOrderReference,
         amountMinor: BigInt(checkout.amountMinor),
         currency: checkout.currency.code,
@@ -49,7 +52,7 @@ class PostgresCheckoutSession implements CheckoutSession {
   }
 
   public async findByReference(
-    businessOrderReference: string,
+    businessOrderReference: BusinessOrderReference,
   ): Promise<Order | undefined> {
     const [row] = await this.transaction
       .select()
@@ -58,7 +61,10 @@ class PostgresCheckoutSession implements CheckoutSession {
     return row && toOrder(row);
   }
 
-  public async bindSubmission(key: string, orderId: string): Promise<void> {
+  public async bindSubmission(
+    key: IdempotencyKey,
+    orderId: OrderId,
+  ): Promise<void> {
     await this.transaction.insert(checkoutIdempotencyKeys).values({
       key,
       orderId: sql`(SELECT id FROM ${orders} WHERE ${orders.publicId} = ${orderId})`,

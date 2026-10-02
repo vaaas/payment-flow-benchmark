@@ -1,3 +1,4 @@
+import { OrderId } from '#src/features/orders/domain/order-id';
 import { OrderReader } from '#src/features/orders/domain/order-reader';
 import { Database } from '#src/infrastructure/postgres/database';
 import { installFeatures } from '#src/bootstrap/install-features';
@@ -9,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import { App } from '#src/http/app';
 import { installPostgresStores } from '#src/bootstrap/install-postgres-stores';
 import { migrate } from '#src/infrastructure/postgres/migrate';
+
 const configuration = Configuration.fromEnv();
 const pool = new Pool({ connectionString: configuration.databaseUrl, max: 20 });
 const container = new Container()
@@ -17,7 +19,7 @@ const container = new Container()
 const orderReader = container.get(OrderReader);
 const store = {
   get: async (id: string) => {
-    const order = await orderReader.find(id);
+    const order = await orderReader.find(OrderId.parse(id));
     if (!order) throw new Error(`Expected order ${id} to exist`);
     return order;
   },
@@ -36,20 +38,24 @@ const checkout = (body = payload) =>
     .send(body);
 const webhook = (orderId: string, eventId: string, outcome = 'succeeded') =>
   request(app).post('/webhooks/payment').send({ orderId, eventId, outcome });
+
 beforeAll(async () => {
   if (!configuration.databaseUrl.endsWith('/checkout_test'))
     throw new Error('Tests require the dedicated checkout_test database');
   await migrate(pool);
 });
+
 beforeEach(async () => {
   await pool.query(
     'TRUNCATE checkout_idempotency_keys, provider_events, orders',
   );
 });
+
 afterAll(async () => {
   await container.get(Database).close();
   await pool.end();
 });
+
 test('concurrent checkout retries create exactly one immutable order', async () => {
   const responses = await Promise.all(
     Array.from({ length: 20 }, () => checkout()),
@@ -72,6 +78,7 @@ test('concurrent checkout retries create exactly one immutable order', async () 
   ).toBe('1999');
   expect((await pool.query('SELECT * FROM orders')).rowCount).toBe(1);
 });
+
 test('concurrent conflicting checkout payloads have a single winner', async () => {
   const responses = await Promise.all(
     Array.from({ length: 20 }, (_, i) =>
@@ -81,6 +88,7 @@ test('concurrent conflicting checkout payloads have a single winner', async () =
   expect(responses.filter((r) => r.status === 201)).toHaveLength(1);
   expect(responses.filter((r) => r.status === 409)).toHaveLength(10);
 });
+
 test('duplicate webhook deliveries commit once and acknowledge retries', async () => {
   const { body: order } = await checkout();
   const results = await Promise.all(
@@ -98,6 +106,7 @@ test('duplicate webhook deliveries commit once and acknowledge retries', async (
   ).toBe('succeeded');
   expect((await webhook(order.id, 'event-1', 'failed')).status).toBe(409);
 });
+
 test('conflicting event IDs and out-of-order deliveries always preserve success', async () => {
   const { body: order } = await checkout();
   expect((await webhook(order.id, 'failed-first', 'failed')).status).toBe(200);
@@ -124,6 +133,7 @@ test('conflicting event IDs and out-of-order deliveries always preserve success'
   ).toBe('succeeded');
   expect((await pool.query('SELECT * FROM provider_events')).rowCount).toBe(32);
 });
+
 test('changed event order cannot apply to another order', async () => {
   const first = (await checkout()).body;
   const second = (
@@ -139,6 +149,7 @@ test('changed event order cannot apply to another order', async () => {
     ).body.status,
   ).toBe('pending');
 });
+
 test('concurrent changed event payloads commit only one event', async () => {
   const { body: order } = await checkout();
   const responses = await Promise.all([
@@ -155,12 +166,14 @@ test('concurrent changed event payloads commit only one event', async () => {
     ).body.status,
   ).toBe(event.outcome);
 });
+
 test('unknown orders do not consume event IDs', async () => {
   expect((await webhook(randomUUID(), 'retryable')).status).toBe(404);
   expect((await pool.query('SELECT * FROM provider_events')).rowCount).toBe(0);
   const { body: order } = await checkout();
   expect((await webhook(order.id, 'retryable')).status).toBe(200);
 });
+
 test('database failure rolls back event insertion and permits identical retry', async () => {
   const { body: order } = await checkout();
   await pool.query(
@@ -183,6 +196,7 @@ test('database failure rolls back event insertion and permits identical retry', 
   }
   expect((await webhook(order.id, 'retry-after-failure')).status).toBe(200);
 });
+
 test('public UUIDs map to serial keys and integer foreign keys without leaking internal IDs', async () => {
   const { body: order } = await checkout();
   await webhook(order.id, 'integer-key-event');
@@ -247,6 +261,7 @@ test.each(['0', '-1', '1.5', '01', '9223372036854775808', 100])(
     ).toBe(400);
   },
 );
+
 test('bigint amounts round-trip exactly', async () => {
   expect(
     (await checkout({ ...payload, amountMinor: '9223372036854775807' })).body

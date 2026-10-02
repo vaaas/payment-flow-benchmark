@@ -1,3 +1,4 @@
+import { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
 import { CreateCheckoutHandler } from '#src/features/checkout/application/create-checkout-handler';
 import { CheckoutConflict } from '#src/features/checkout/domain/checkout-conflict';
 import { CreateCheckout } from '#src/features/checkout/domain/create-checkout';
@@ -80,7 +81,9 @@ test('a key may bind to an order created without one', async () => {
   const first = await submit();
   const keyed = await submit({}, 'late-key');
   expect(keyed.order).toBe(first.order);
-  expect(stores.data.submissions.get('late-key')).toBe(first.order.id);
+  expect(stores.data.submissions.get(IdempotencyKey.parse('late-key'))).toBe(
+    first.order.id,
+  );
 });
 
 test('a conflicting request does not consume its key', async () => {

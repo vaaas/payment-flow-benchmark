@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import type { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
+import type { OrderId } from '#src/features/orders/domain/order-id';
 import type { Currency } from '#src/shared/domain/currency';
 import type { Checkout } from '#src/features/checkout/domain/create-checkout';
 import type { PaymentOutcome } from '#src/features/payments/domain/receive-webhook';
@@ -9,15 +11,15 @@ export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
 
 export type OrderSnapshot = Checkout &
   Readonly<{
-    id: string;
+    id: OrderId;
     status: PaymentStatus;
     createdAt: string;
     updatedAt: string;
   }>;
 
 export class Order implements OrderSnapshot {
-  public readonly id: string;
-  public readonly businessOrderReference: string;
+  public readonly id: OrderId;
+  public readonly businessOrderReference: BusinessOrderReference;
   public readonly amountMinor: string;
   public readonly currency: Currency;
   public readonly status: PaymentStatus;

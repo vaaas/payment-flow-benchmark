@@ -1,5 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import type { Container } from '#src/application/dependency-injection/container';
+import type { OrderId } from '#src/features/orders/domain/order-id';
+import type { ProviderEventId } from '#src/features/payments/domain/provider-event-id';
 import type { Order, PaymentStatus } from '#src/features/orders/domain/order';
 import { toOrder } from '#src/features/orders/infrastructure/order-mapper';
 import type {
@@ -15,7 +17,7 @@ import type { PostgresTransaction } from '#src/infrastructure/postgres/with-data
 class PostgresPaymentSession implements PaymentSession {
   constructor(private readonly transaction: PostgresTransaction) {}
 
-  public async lockOrder(orderId: string): Promise<Order | undefined> {
+  public async lockOrder(orderId: OrderId): Promise<Order | undefined> {
     const [row] = await this.transaction
       .select()
       .from(orders)
@@ -37,7 +39,7 @@ class PostgresPaymentSession implements PaymentSession {
     return inserted.length > 0;
   }
 
-  public async findEvent(eventId: string): Promise<ProviderEvent | undefined> {
+  public async findEvent(eventId: ProviderEventId): Promise<ProviderEvent | undefined> {
     const [row] = await this.transaction
       .select({
         eventId: providerEvents.eventId,
@@ -51,7 +53,7 @@ class PostgresPaymentSession implements PaymentSession {
   }
 
   public async updateStatus(
-    orderId: string,
+    orderId: OrderId,
     status: PaymentStatus,
   ): Promise<void> {
     await this.transaction

@@ -2,8 +2,11 @@ import type {
   CheckoutSession,
   CheckoutStore,
 } from '#src/features/checkout/domain/checkout-store';
+import type { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
+import type { ProviderEventId } from '#src/features/payments/domain/provider-event-id';
 import type { Checkout } from '#src/features/checkout/domain/create-checkout';
 import { Order } from '#src/features/orders/domain/order';
+import { OrderId } from '#src/features/orders/domain/order-id';
 import type { PaymentStatus } from '#src/features/orders/domain/order';
 import type { OrderReader } from '#src/features/orders/domain/order-reader';
 import type {
@@ -13,12 +16,12 @@ import type {
 import type { ProviderEvent } from '#src/features/payments/domain/receive-webhook';
 
 export class InMemoryOrderData {
-  public orders = new Map<string, Order>();
-  public events = new Map<string, ProviderEvent>();
-  public submissions = new Map<string, string>();
+  public orders = new Map<OrderId, Order>();
+  public events = new Map<ProviderEventId, ProviderEvent>();
+  public submissions = new Map<IdempotencyKey, OrderId>();
 
   constructor(
-    public readonly newId: () => string,
+    public readonly newId: () => OrderId,
     public readonly now: () => string,
   ) {}
 
@@ -58,7 +61,7 @@ export class InMemoryCheckoutStore implements CheckoutStore {
 
   private session(): CheckoutSession {
     const { data } = this;
-    const find = (id: string | undefined) =>
+    const find = (id: OrderId | undefined) =>
       id === undefined ? undefined : data.orders.get(id);
     return {
       lockSubmission: async () => undefined,
@@ -125,7 +128,7 @@ export class InMemoryPaymentStore implements PaymentStore {
 export class InMemoryOrderReader implements OrderReader {
   constructor(private readonly data: InMemoryOrderData) {}
 
-  public async find(id: string): Promise<Order | undefined> {
+  public async find(id: OrderId): Promise<Order | undefined> {
     return this.data.orders.get(id);
   }
 }
@@ -133,7 +136,10 @@ export class InMemoryOrderReader implements OrderReader {
 export function createInMemoryStores() {
   let sequence = 0;
   const data = new InMemoryOrderData(
-    () => `00000000-0000-4000-8000-${String(++sequence).padStart(12, '0')}`,
+    () =>
+      OrderId.parse(
+        `00000000-0000-4000-8000-${String(++sequence).padStart(12, '0')}`,
+      ),
     () => new Date(Date.UTC(2026, 9, 1, 10, 0, sequence)).toISOString(),
   );
   return {

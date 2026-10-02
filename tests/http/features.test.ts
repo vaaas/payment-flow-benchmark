@@ -1,3 +1,5 @@
+import { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
+import { OrderId } from '#src/features/orders/domain/order-id';
 import { Currency } from '#src/shared/domain/currency';
 import { Configuration } from '#src/configuration/configuration';
 import request from 'supertest';
@@ -18,7 +20,10 @@ test('one feature installation wires its dependencies, events and routes without
   const order = new Order({
     ...payload,
     currency: Currency.of(payload.currency),
-    id: '11111111-1111-4111-8111-111111111111',
+    businessOrderReference: BusinessOrderReference.parse(
+      payload.businessOrderReference,
+    ),
+    id: OrderId.parse('11111111-1111-4111-8111-111111111111'),
     status: 'pending',
     createdAt: '2026-10-01T10:00:00.000Z',
     updatedAt: '2026-10-01T10:00:00.000Z',
