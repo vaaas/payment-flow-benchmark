@@ -6,3 +6,5 @@ coverage/
 *.pem
 *.key
 !.env.example
+reports/
+.stryker-tmp/

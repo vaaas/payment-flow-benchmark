@@ -4,3 +4,5 @@ coverage/
 .agents/
 .aws/
 .codex/
+reports/
+.stryker-tmp/

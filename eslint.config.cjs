@@ -6,6 +6,8 @@ module.exports = [
       'dist/**',
       'node_modules/**',
       'coverage/**',
+      'reports/**',
+      '.stryker-tmp/**',
       '.agents/**',
       '.aws/**',
       '.codex/**',
