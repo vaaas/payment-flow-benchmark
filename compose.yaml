@@ -28,6 +28,7 @@ services:
       - -ec
       - |
         npm ci --no-audit --no-fund
+        until node -e "const client = new (require('pg').Client)({ connectionString: process.env.DATABASE_URL }); client.connect().then(() => client.end(), () => process.exit(1))"; do sleep 1; done
         npm run migrate
         exec npm run dev
     env_file: .env
@@ -41,8 +42,7 @@ services:
       - ./migrations:/app/migrations:ro
       - ./openapi.json:/app/openapi.json:ro
     depends_on:
-      database:
-        condition: service_healthy
+      - database
 
   test-database:
     image: docker.io/library/postgres:17.6

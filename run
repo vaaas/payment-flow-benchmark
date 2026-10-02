@@ -20,7 +20,24 @@ compose() {
   "$container_engine" compose "$@"
 }
 
+ensure_environment_file() {
+  [[ -f .env ]] || cp .env.example .env
+}
+
+remove_development_services() {
+  compose kill --signal SIGINT database > /dev/null 2>&1 || true
+  compose kill --signal SIGTERM api > /dev/null 2>&1 || true
+  sleep 2
+  compose kill api > /dev/null 2>&1 || true
+  compose kill database > /dev/null 2>&1 || true
+  compose down --timeout 1 --remove-orphans > /dev/null 2>&1 || true
+}
+
 start_development() {
+  ensure_environment_file
+  trap 'exit 130' INT TERM HUP
+  trap remove_development_services EXIT
+  remove_development_services
   compose up --build --detach api
   compose logs --follow api database
 }
@@ -41,7 +58,10 @@ run_npm() {
 }
 
 stop_services() {
+  ensure_environment_file
+  remove_development_services
   compose --profile tools down
+  test_compose kill test-database > /dev/null 2>&1 || true
   test_compose down
 }
 
