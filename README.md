@@ -69,6 +69,16 @@ The response includes an `id` (UUID). A new order returns `201`. A retry with th
 
 Retries are recognised by `businessOrderReference`; no key is needed. An optional `Idempotency-Key` header (1–128 characters) is also accepted. The first request with a key wins; later requests with that key return its order with `200`, even if their payload differs.
 
+### Currency
+
+`amountMinor` is a string of minor units. `"1999"` is 19.99 EUR. The number of decimal places depends on the currency: `JPY` has 0, `EUR` has 2, `BHD` has 3.
+
+`currency` must be an ISO 4217 code such as `EUR`, `JPY` or `XOF`. Anything else, including lowercase, `ZZZ`, or a non-ISO code, returns `400`. Codes that are not payment currencies are also rejected: `XXX`, `XTS`, precious metals (`XAU`, `XAG`, `XPD`, `XPT`), `XDR`, bond units (`XBA`–`XBD`), `XSU` and `XUA`. The accepted codes are listed in the OpenAPI spec.
+
+Codes are parsed by the `Currency` domain object in `src/shared/domain/currency.ts`, which uses the [`currency-codes`](https://www.npmjs.com/package/currency-codes) package. It also holds each currency's minor-unit digits. The service does not yet check that an amount fits those digits. A stored order with an unknown currency is a processing failure (`503`), never served.
+
+The package data is dated 2024-06. Update the package to follow later ISO changes.
+
 ### Simulating the provider's payment via webhook:
 
 ```
