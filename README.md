@@ -40,6 +40,7 @@ Barebones rate-limitting is provided as a sample in `src/http/rate-limiting/rate
 Application features are organised in the `src/features` directory. We have 3 features: `checkout`, `orders`, and `payments`. Each feature defines an installer, allowing for straightforward registration of its behavior on our `App` by changing a single line of code.
 
 Every feature is roughly organised into 3 layers:
+
 - domain layer: defines domain objects or data transfer objects (i.e. data structures)
 - http layer: the http port of our application (as opposed to, say, websocket ports)
 - application layer: where business logic happens
@@ -50,14 +51,12 @@ Feature splitting is excessive for this project as arguably all 3 belong in the 
 
 Defined in our OpenAPI spec, but very roughly as follows:
 
-
 ### Creating a checkout
 
 ```
 POST /checkout-intents
 Authorization: Bearer your-api-key
 Content-Type: application/json
-Idempotency-Key: some-contrived-key
 
 {
     "businessOrderReference": "merchant-123",
@@ -66,9 +65,9 @@ Idempotency-Key: some-contrived-key
 }
 ```
 
-The response includes an `id` (UUID).
+The response includes an `id` (UUID). A new order returns `201`. A retry with the same reference and a matching payload returns the existing order with `200` and creates nothing. The same reference with a different amount or currency returns `409` and leaves the existing order unchanged.
 
-Note that we accept an optional idempotency key, allowed to be any contrived string defined by our consumer. For example, one may send `<userId>-<YYYY-MM-dd>`. This is a safety measure to prevent double writes. In the case of double writes, the first one simply wins.
+Retries are recognised by `businessOrderReference`; no key is needed. An optional `Idempotency-Key` header (1–128 characters) is also accepted. The first request with a key wins; later requests with that key return its order with `200`, even if their payload differs.
 
 ### Simulating the provider's payment via webhook:
 
@@ -77,19 +76,19 @@ POST /webhooks/payment
 Content-Type: application/json
 
 {
-    {
-        "eventId": "evt-1",
-        "orderId": <the-previous-uuid>,
-        "outcome": "succeeded"
-    }
+    "eventId": "evt-1",
+    "orderId": "<the-previous-uuid>",
+    "outcome": "succeeded"
 }
 ```
+
+First delivery returns `200` with `{"duplicate":false}`. An identical redelivery returns `200` with `{"duplicate":true}` and applies nothing. An unknown order returns `404`.
 
 ### Reading the result
 
 ```
 GET /orders/<the-previous-uuid>
-Authorization: your-api-key
+Authorization: Bearer your-api-key
 ```
 
 ## Correctness and transactions
@@ -97,13 +96,28 @@ Authorization: your-api-key
 Orders start `pending`.
 
 Allowed transitions:
+
 - `pending → failed`
 - `pending → succeeded`
 - `failed → succeeded`
 
 Repeated statuses are no-ops. Success is permanent (no transition out of success exists). Failure may be corrected by later success, even with an earlier provider timestamp. Every distinct valid event is retained, including ignored failures after success. Identical payload means the validated fields match, regardless of JSON key order.
 
-Checkouts insert-on-conflict and perform payload comparison in one transaction. We use a unique reference constraint to choose one winder under concurrent requests. The next read sees the winner. Mismatches roll back.
+### Business order references
+
+References are unique across the whole service, which serves a single merchant. They are case-sensitive. Before production, scope them by merchant.
+
+### Webhook event policy
+
+Events can arrive late, out of order, or more than once, and different event IDs can report conflicting outcomes. The outcome decides, not arrival order or provider timestamps:
+
+- `succeeded` is final. Later events are stored but never change it.
+- `failed` can become `succeeded`, because a provider may report a failure and then succeed on retry.
+- The same event ID with an identical payload is a duplicate. It is acknowledged and applied once.
+- The same event ID with a different payload (another outcome or another order) returns `409`. It is not stored and not applied.
+- The order is checked first. An unknown order returns `404`, even if the event ID was used before. The event ID is not consumed.
+
+Checkouts insert-on-conflict and perform payload comparison in one transaction. We use a unique reference constraint to choose one winner under concurrent requests. The next read sees the winner. Mismatches roll back.
 
 Each webhook locks its order with `SELECT FOR UPDATE`, inserts its event using the unique event ID, compares payload on conflict, and updates status in the same transaction. Locking before insertion also avoids foreign-key deadlocks between events on one order.
 
