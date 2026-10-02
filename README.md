@@ -126,6 +126,14 @@ Allowed transitions:
 
 Repeated statuses are no-ops. Success is permanent (no transition out of success exists). Failure may be corrected by later success, even with an earlier provider timestamp. Every distinct valid event is retained, including ignored failures after success. Identical payload means the validated fields match, regardless of JSON key order.
 
+### Events and status
+
+`provider_events` is an append-only log of what the provider reported. `orders.status` is a projection of that log, updated in the same transaction as the event, so a webhook is acknowledged only after both are committed and a read straight after sees the new status. This is not full event sourcing: orders are ordinary rows, and nothing is derived by replay at read time.
+
+The allowed transitions are declared as data in `src/features/orders/domain/payment-status.ts`, next to a pure fold over outcomes. `Order.applyOutcome(outcome, at)` applies one event and returns the same order when nothing changes, so only a real change is written and `updatedAt` moves only then.
+
+The fold is the highest outcome seen (`pending < failed < succeeded`). It is therefore independent of arrival order, unchanged by redelivery, and the same whether applied one event at a time or all at once. Property tests check these, and database tests check that every stored status equals the fold of its stored events and that the projection can be rebuilt from the log alone. This is what would make processing safe to parallelise within one order later; today a row lock per order serialises it.
+
 ### Business order references
 
 References are unique across the whole service, which serves a single merchant. They are case-sensitive. Before production, scope them by merchant.
