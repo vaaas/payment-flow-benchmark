@@ -1,3 +1,4 @@
+import { Amount } from '#src/shared/domain/amount';
 import { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
 import { CreateCheckoutHandler } from '#src/features/checkout/application/create-checkout-handler';
 import { CheckoutConflict } from '#src/features/checkout/domain/checkout-conflict';
@@ -25,7 +26,7 @@ test('a new checkout creates a pending order', async () => {
   expect(result.created).toBe(true);
   expect(result.order).toMatchObject({
     businessOrderReference: 'merchant-123',
-    amountMinor: '1999',
+    amountMinor: Amount.of(1999n),
     status: 'pending',
   });
   expect(result.order.currency.code).toBe('EUR');

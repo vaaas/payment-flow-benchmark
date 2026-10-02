@@ -1,3 +1,4 @@
+import { Amount } from '#src/shared/domain/amount';
 import { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
 import { OrderId } from '#src/features/orders/domain/order-id';
 import { Currency } from '#src/shared/domain/currency';
@@ -20,6 +21,7 @@ test('one feature installation wires its dependencies, events and routes without
   const order = new Order({
     ...payload,
     currency: Currency.of(payload.currency),
+    amountMinor: Amount.of(1999n),
     businessOrderReference: BusinessOrderReference.parse(
       payload.businessOrderReference,
     ),

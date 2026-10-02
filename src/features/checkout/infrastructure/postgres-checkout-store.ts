@@ -43,7 +43,7 @@ class PostgresCheckoutSession implements CheckoutSession {
       .values({
         publicId: OrderId.parse(randomUUID()),
         businessOrderReference: checkout.businessOrderReference,
-        amountMinor: BigInt(checkout.amountMinor),
+        amountMinor: checkout.amountMinor.minorUnits,
         currency: checkout.currency.code,
       })
       .onConflictDoNothing({ target: orders.businessOrderReference })

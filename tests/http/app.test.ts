@@ -1,3 +1,4 @@
+import { Amount } from '#src/shared/domain/amount';
 import { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
 import { OrderId } from '#src/features/orders/domain/order-id';
 import { Currency } from '#src/shared/domain/currency';
@@ -99,6 +100,7 @@ const checkoutPayload = {
 const order = new Order({
   ...checkoutPayload,
   currency: Currency.of(checkoutPayload.currency),
+  amountMinor: Amount.of(1999n),
   businessOrderReference: BusinessOrderReference.parse(
     checkoutPayload.businessOrderReference,
   ),
@@ -126,6 +128,7 @@ test('checkout route dispatches a parsed immutable domain command', async () => 
   expect(command.payload).toEqual({
     ...checkoutPayload,
     currency: Currency.of(checkoutPayload.currency),
+    amountMinor: Amount.of(1999n),
   });
   expect(command.idempotencyKey).toBe('checkout-submission');
   expect(stores.checkout.transaction).toHaveBeenCalledTimes(1);

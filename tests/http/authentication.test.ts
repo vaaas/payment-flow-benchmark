@@ -1,3 +1,4 @@
+import { Amount } from '#src/shared/domain/amount';
 import { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
 import { OrderId } from '#src/features/orders/domain/order-id';
 import { Currency } from '#src/shared/domain/currency';
@@ -17,6 +18,7 @@ const payload = {
 const order = new Order({
   ...payload,
   currency: Currency.of(payload.currency),
+  amountMinor: Amount.of(1999n),
   businessOrderReference: BusinessOrderReference.parse(
     payload.businessOrderReference,
   ),
