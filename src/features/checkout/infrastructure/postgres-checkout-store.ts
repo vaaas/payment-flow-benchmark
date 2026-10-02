@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import type { Container } from '#src/application/dependency-injection/container';
 import type {
@@ -7,8 +6,7 @@ import type {
 } from '#src/features/checkout/domain/checkout-store';
 import type { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
 import type { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
-import type { Checkout } from '#src/features/checkout/domain/create-checkout';
-import { OrderId } from '#src/features/orders/domain/order-id';
+import type { OrderId } from '#src/features/orders/domain/order-id';
 import type { Order } from '#src/features/orders/domain/order';
 import { toOrder } from '#src/features/orders/infrastructure/order-mapper';
 import { Database } from '#src/infrastructure/postgres/database';
@@ -28,7 +26,9 @@ class PostgresCheckoutSession implements CheckoutSession {
     );
   }
 
-  public async findBySubmission(key: IdempotencyKey): Promise<Order | undefined> {
+  public async findBySubmission(
+    key: IdempotencyKey,
+  ): Promise<Order | undefined> {
     const [row] = await this.transaction
       .select({ order: orders })
       .from(checkoutIdempotencyKeys)
@@ -37,18 +37,21 @@ class PostgresCheckoutSession implements CheckoutSession {
     return row && toOrder(row.order);
   }
 
-  public async insertIfAbsent(checkout: Checkout): Promise<Order | undefined> {
-    const [row] = await this.transaction
+  public async insertIfAbsent(order: Order): Promise<boolean> {
+    const inserted = await this.transaction
       .insert(orders)
       .values({
-        publicId: OrderId.parse(randomUUID()),
-        businessOrderReference: checkout.businessOrderReference,
-        amountMinor: checkout.amountMinor.minorUnits,
-        currency: checkout.currency.code,
+        publicId: order.id,
+        businessOrderReference: order.businessOrderReference,
+        amountMinor: order.amountMinor.minorUnits,
+        currency: order.currency.code,
+        status: order.status,
+        createdAt: order.createdAt.toDate(),
+        updatedAt: order.updatedAt.toDate(),
       })
       .onConflictDoNothing({ target: orders.businessOrderReference })
-      .returning();
-    return row && toOrder(row);
+      .returning({ id: orders.id });
+    return inserted.length > 0;
   }
 
   public async findByReference(

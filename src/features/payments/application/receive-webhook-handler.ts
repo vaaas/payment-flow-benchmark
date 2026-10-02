@@ -1,5 +1,6 @@
 import type { Container } from '#src/application/dependency-injection/container';
 import type { EventHandler } from '#src/application/event-handler';
+import { Clock } from '#src/shared/domain/clock';
 import { OrderNotFound } from '#src/features/orders/domain/order-not-found';
 import { PaymentStore } from '#src/features/payments/domain/payment-store';
 import { ProviderEventConflict } from '#src/features/payments/domain/provider-event-conflict';
@@ -10,10 +11,16 @@ import type {
 
 export class ReceiveWebhookHandler implements EventHandler<ReceiveWebhook> {
   public static provide(container: Container): ReceiveWebhookHandler {
-    return new ReceiveWebhookHandler(container.get(PaymentStore));
+    return new ReceiveWebhookHandler(
+      container.get(PaymentStore),
+      container.get(Clock),
+    );
   }
 
-  constructor(private readonly store: PaymentStore) {}
+  constructor(
+    private readonly store: PaymentStore,
+    private readonly clock: Clock,
+  ) {}
 
   public handle(event: ReceiveWebhook): Promise<WebhookReceipt> {
     const { eventId, outcome } = event.payload;
@@ -30,7 +37,8 @@ export class ReceiveWebhookHandler implements EventHandler<ReceiveWebhook> {
         return { duplicate: true };
       }
       const status = order.paymentStatusAfter(outcome);
-      if (status !== order.status) await session.updateStatus(order.id, status);
+      if (status !== order.status)
+        await session.updateStatus(order.id, status, this.clock.now());
       return { duplicate: false };
     });
   }

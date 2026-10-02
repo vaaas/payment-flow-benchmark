@@ -17,7 +17,8 @@ export const orders = pgTable('orders', {
   publicId: uuid('public_id').$type<OrderId>().notNull().unique(),
   businessOrderReference: text('business_order_reference')
     .$type<BusinessOrderReference>()
-    .notNull().unique(),
+    .notNull()
+    .unique(),
   amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
   currency: text('currency').notNull(),
   status: text('status').$type<PaymentStatus>().notNull().default('pending'),

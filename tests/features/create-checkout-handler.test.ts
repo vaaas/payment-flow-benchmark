@@ -14,7 +14,11 @@ const body = {
 
 function setup() {
   const stores = createInMemoryStores();
-  const handler = new CreateCheckoutHandler(stores.checkout);
+  const handler = new CreateCheckoutHandler(
+    stores.checkout,
+    stores.ids,
+    stores.clock,
+  );
   const submit = (override: object = {}, key?: string) =>
     handler.handle(CreateCheckout.from({ ...body, ...override }, key));
   return { stores, handler, submit };
@@ -114,15 +118,17 @@ test('a failure after the order is inserted rolls the whole checkout back', asyn
         }),
       ),
   };
-  const handler = new CreateCheckoutHandler(failing);
+  const handler = new CreateCheckoutHandler(failing, stores.ids, stores.clock);
   await expect(
     handler.handle(CreateCheckout.from(body, 'doomed')),
   ).rejects.toThrow('Injected failure');
   expect(stores.data.orders.size).toBe(0);
   expect(stores.data.submissions.size).toBe(0);
-  const retry = await new CreateCheckoutHandler(stores.checkout).handle(
-    CreateCheckout.from(body, 'doomed'),
-  );
+  const retry = await new CreateCheckoutHandler(
+    stores.checkout,
+    stores.ids,
+    stores.clock,
+  ).handle(CreateCheckout.from(body, 'doomed'));
   expect(retry.created).toBe(true);
 });
 
@@ -133,12 +139,36 @@ test('an order that vanishes between insert and lookup is a processing error', a
       stores.checkout.transaction((session) =>
         work({
           ...session,
-          insertIfAbsent: async () => undefined,
+          insertIfAbsent: async () => false,
           findByReference: async () => undefined,
         }),
       ),
   };
   await expect(
-    new CreateCheckoutHandler(vanishing).handle(CreateCheckout.from(body)),
+    new CreateCheckoutHandler(vanishing, stores.ids, stores.clock).handle(
+      CreateCheckout.from(body),
+    ),
   ).rejects.toThrow('Checkout order disappeared during creation');
+});
+
+test('the order takes its identifier and timestamps from the injected generator and clock', async () => {
+  const { stores, submit } = setup();
+  const first = await submit();
+  stores.clock.advance(5000);
+  const second = await submit({ businessOrderReference: 'second' });
+  expect(first.order.id).toBe('00000000-0000-4000-8000-000000000001');
+  expect(String(first.order.createdAt)).toBe('2026-10-01T10:00:00.000Z');
+  expect(first.order.updatedAt.equals(first.order.createdAt)).toBe(true);
+  expect(second.order.id).toBe('00000000-0000-4000-8000-000000000002');
+  expect(String(second.order.createdAt)).toBe('2026-10-01T10:00:05.000Z');
+});
+
+test('a retry keeps the original identifier and timestamps', async () => {
+  const { stores, submit } = setup();
+  const first = await submit();
+  stores.clock.advance(60000);
+  const retry = await submit();
+  expect(retry.order.id).toBe(first.order.id);
+  expect(retry.order.createdAt.equals(first.order.createdAt)).toBe(true);
+  expect(retry.order.updatedAt.equals(first.order.updatedAt)).toBe(true);
 });

@@ -7,7 +7,11 @@ import { createInMemoryStores } from '#tests/support/in-memory-stores';
 
 test('an existing order is returned as stored', async () => {
   const stores = createInMemoryStores();
-  const { order } = await new CreateCheckoutHandler(stores.checkout).handle(
+  const { order } = await new CreateCheckoutHandler(
+    stores.checkout,
+    stores.ids,
+    stores.clock,
+  ).handle(
     CreateCheckout.from({
       businessOrderReference: 'merchant-123',
       amountMinor: '1999',
@@ -32,7 +36,11 @@ test('a missing order is reported as not found', async () => {
 test('a lookup never changes the stored order', async () => {
   const stores = createInMemoryStores();
   const handler = new GetOrderHandler(stores.orders);
-  const { order } = await new CreateCheckoutHandler(stores.checkout).handle(
+  const { order } = await new CreateCheckoutHandler(
+    stores.checkout,
+    stores.ids,
+    stores.clock,
+  ).handle(
     CreateCheckout.from({
       businessOrderReference: 'merchant-123',
       amountMinor: '1999',

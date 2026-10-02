@@ -1,3 +1,4 @@
+import { Timestamp } from '#src/shared/domain/timestamp';
 import { Amount } from '#src/shared/domain/amount';
 import { BusinessOrderReference } from '#src/features/checkout/domain/business-order-reference';
 import { OrderId } from '#src/features/orders/domain/order-id';
@@ -27,8 +28,8 @@ test('one feature installation wires its dependencies, events and routes without
     ),
     id: OrderId.parse('11111111-1111-4111-8111-111111111111'),
     status: 'pending',
-    createdAt: '2026-10-01T10:00:00.000Z',
-    updatedAt: '2026-10-01T10:00:00.000Z',
+    createdAt: Timestamp.of(new Date('2026-10-01T10:00:00.000Z')),
+    updatedAt: Timestamp.of(new Date('2026-10-01T10:00:00.000Z')),
   });
   const stores = createStoreFakes();
   stores.checkout.transaction.mockResolvedValue({ order, created: true });

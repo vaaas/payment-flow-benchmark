@@ -235,7 +235,7 @@ test('application updates timestamps only when the status changes', async () => 
   expect(failed.updatedAt).not.toBe(firstTimestamp);
   await webhook(order.id, 'failure', 'failed');
   await webhook(order.id, 'another-failure', 'failed');
-  expect((await store.get(order.id)).updatedAt).toBe(failed.updatedAt);
+  expect(String((await store.get(order.id)).updatedAt)).toBe(failed.updatedAt);
   await pool.query('UPDATE orders SET updated_at=$1 WHERE public_id=$2', [
     firstTimestamp,
     order.id,
@@ -243,9 +243,11 @@ test('application updates timestamps only when the status changes', async () => 
   await webhook(order.id, 'success');
   const succeeded = await store.get(order.id);
   expect(succeeded.status).toBe('succeeded');
-  expect(succeeded.updatedAt).not.toBe(firstTimestamp);
+  expect(String(succeeded.updatedAt)).not.toBe(firstTimestamp);
   await webhook(order.id, 'late-failure', 'failed');
-  expect((await store.get(order.id)).updatedAt).toBe(succeeded.updatedAt);
+  expect(
+    (await store.get(order.id)).updatedAt.equals(succeeded.updatedAt),
+  ).toBe(true);
 });
 
 test.each(['0', '-1', '1.5', '01', '9223372036854775808', 100])(

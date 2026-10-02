@@ -4,9 +4,13 @@ import type {
 } from '#src/features/checkout/domain/checkout-store';
 import type { IdempotencyKey } from '#src/features/checkout/domain/idempotency-key';
 import type { ProviderEventId } from '#src/features/payments/domain/provider-event-id';
-import type { Checkout } from '#src/features/checkout/domain/create-checkout';
 import { Order } from '#src/features/orders/domain/order';
-import { OrderId } from '#src/features/orders/domain/order-id';
+import {
+  OrderId,
+  OrderIdGenerator,
+} from '#src/features/orders/domain/order-id';
+import { Clock } from '#src/shared/domain/clock';
+import { Timestamp } from '#src/shared/domain/timestamp';
 import type { PaymentStatus } from '#src/features/orders/domain/order';
 import type { OrderReader } from '#src/features/orders/domain/order-reader';
 import type {
@@ -19,11 +23,6 @@ export class InMemoryOrderData {
   public orders = new Map<OrderId, Order>();
   public events = new Map<ProviderEventId, ProviderEvent>();
   public submissions = new Map<IdempotencyKey, OrderId>();
-
-  constructor(
-    public readonly newId: () => OrderId,
-    public readonly now: () => string,
-  ) {}
 
   public snapshot() {
     return {
@@ -66,22 +65,14 @@ export class InMemoryCheckoutStore implements CheckoutStore {
     return {
       lockSubmission: async () => undefined,
       findBySubmission: async (key) => find(data.submissions.get(key)),
-      insertIfAbsent: async (checkout: Checkout) => {
+      insertIfAbsent: async (order: Order) => {
         const taken = [...data.orders.values()].some(
-          (order) =>
-            order.businessOrderReference === checkout.businessOrderReference,
+          (existing) =>
+            existing.businessOrderReference === order.businessOrderReference,
         );
-        if (taken) return undefined;
-        const now = data.now();
-        const order = new Order({
-          ...checkout,
-          id: data.newId(),
-          status: 'pending',
-          createdAt: now,
-          updatedAt: now,
-        });
+        if (taken) return false;
         data.orders.set(order.id, order);
-        return order;
+        return true;
       },
       findByReference: async (reference) =>
         [...data.orders.values()].find(
@@ -113,13 +104,10 @@ export class InMemoryPaymentStore implements PaymentStore {
         return true;
       },
       findEvent: async (eventId) => data.events.get(eventId),
-      updateStatus: async (orderId, status: PaymentStatus) => {
+      updateStatus: async (orderId, status: PaymentStatus, at) => {
         const order = data.orders.get(orderId);
         if (!order) throw new Error('Cannot update a missing order');
-        data.orders.set(
-          orderId,
-          new Order({ ...order, status, updatedAt: data.now() }),
-        );
+        data.orders.set(orderId, order.withStatus(status, at));
       },
     };
   }
@@ -133,22 +121,41 @@ export class InMemoryOrderReader implements OrderReader {
   }
 }
 
+export class FakeClock extends Clock {
+  constructor(private current: Timestamp) {
+    super();
+  }
+
+  public override now(): Timestamp {
+    return this.current;
+  }
+
+  public advance(milliseconds: number): void {
+    this.current = Timestamp.of(
+      new Date(this.current.epochMilliseconds + milliseconds),
+    );
+  }
+}
+
+export class SequentialOrderIds extends OrderIdGenerator {
+  private sequence = 0;
+
+  public override next(): OrderId {
+    this.sequence += 1;
+    return OrderId.parse(
+      `00000000-0000-4000-8000-${String(this.sequence).padStart(12, '0')}`,
+    );
+  }
+}
+
 export function createInMemoryStores() {
-  let sequence = 0;
-  const data = new InMemoryOrderData(
-    () =>
-      OrderId.parse(
-        `00000000-0000-4000-8000-${String(++sequence).padStart(12, '0')}`,
-      ),
-    () => new Date(Date.UTC(2026, 9, 1, 10, 0, sequence)).toISOString(),
-  );
+  const data = new InMemoryOrderData();
   return {
     data,
+    clock: new FakeClock(Timestamp.of(new Date('2026-10-01T10:00:00.000Z'))),
+    ids: new SequentialOrderIds(),
     checkout: new InMemoryCheckoutStore(data),
     payments: new InMemoryPaymentStore(data),
     orders: new InMemoryOrderReader(data),
-    tick: () => {
-      sequence += 100;
-    },
   };
 }

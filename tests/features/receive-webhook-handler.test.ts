@@ -10,8 +10,12 @@ import { createInMemoryStores } from '#tests/support/in-memory-stores';
 
 async function setup() {
   const stores = createInMemoryStores();
-  const checkout = new CreateCheckoutHandler(stores.checkout);
-  const handler = new ReceiveWebhookHandler(stores.payments);
+  const checkout = new CreateCheckoutHandler(
+    stores.checkout,
+    stores.ids,
+    stores.clock,
+  );
+  const handler = new ReceiveWebhookHandler(stores.payments, stores.clock);
   const place = async (businessOrderReference = 'merchant-123') =>
     (
       await checkout.handle(
@@ -131,18 +135,18 @@ test('an unknown order is reported before an event ID conflict', async () => {
 test('only a status change moves the update timestamp', async () => {
   const { stores, receive, order } = await setup();
   const created = stores.data.orders.get(order.id);
-  stores.tick();
+  stores.clock.advance(1000);
   await receive('evt-1', 'failed');
   const failed = stores.data.orders.get(order.id);
   expect(failed?.updatedAt).not.toBe(created?.updatedAt);
-  stores.tick();
+  stores.clock.advance(1000);
   await receive('evt-2', 'failed');
   expect(stores.data.orders.get(order.id)).toBe(failed);
-  stores.tick();
+  stores.clock.advance(1000);
   await receive('evt-3', 'succeeded');
   const succeeded = stores.data.orders.get(order.id);
   expect(succeeded?.updatedAt).not.toBe(failed?.updatedAt);
-  stores.tick();
+  stores.clock.advance(1000);
   await receive('evt-4', 'failed');
   expect(stores.data.orders.get(order.id)).toBe(succeeded);
 });
@@ -166,12 +170,23 @@ test('a failure while updating the status rolls the event back so a retry can su
     outcome: 'succeeded',
   });
   await expect(
-    new ReceiveWebhookHandler(failing).handle(event),
+    new ReceiveWebhookHandler(failing, stores.clock).handle(event),
   ).rejects.toThrow('Injected failure');
   expect(stores.data.events.size).toBe(0);
   expect(
-    await new ReceiveWebhookHandler(stores.payments).handle(event),
+    await new ReceiveWebhookHandler(stores.payments, stores.clock).handle(
+      event,
+    ),
   ).toEqual({
     duplicate: false,
   });
+});
+
+test('the status change is stamped with the injected clock and creation time is untouched', async () => {
+  const { stores, receive, order } = await setup();
+  stores.clock.advance(90000);
+  await receive('evt-1', 'succeeded');
+  const stored = stores.data.orders.get(order.id);
+  expect(String(stored?.updatedAt)).toBe('2026-10-01T10:01:30.000Z');
+  expect(String(stored?.createdAt)).toBe('2026-10-01T10:00:00.000Z');
 });

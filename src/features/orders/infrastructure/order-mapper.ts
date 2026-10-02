@@ -1,5 +1,6 @@
 import { Order, paymentStatusSchema } from '#src/features/orders/domain/order';
 import { Amount } from '#src/shared/domain/amount';
+import { Timestamp } from '#src/shared/domain/timestamp';
 import { Currency } from '#src/shared/domain/currency';
 import type { orders } from '#src/infrastructure/postgres/schema';
 
@@ -13,7 +14,7 @@ export const toOrder = (row: typeof orders.$inferSelect): Order => {
     currency: Currency.of(row.currency),
     status: status.data,
     amountMinor: Amount.of(row.amountMinor),
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
+    createdAt: Timestamp.of(row.createdAt),
+    updatedAt: Timestamp.of(row.updatedAt),
   });
 };

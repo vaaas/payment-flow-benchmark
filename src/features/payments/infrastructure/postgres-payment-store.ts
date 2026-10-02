@@ -9,6 +9,7 @@ import type {
   PaymentStore,
 } from '#src/features/payments/domain/payment-store';
 import type { ProviderEvent } from '#src/features/payments/domain/receive-webhook';
+import type { Timestamp } from '#src/shared/domain/timestamp';
 import { Database } from '#src/infrastructure/postgres/database';
 import { orders, providerEvents } from '#src/infrastructure/postgres/schema';
 import { withTransaction } from '#src/infrastructure/postgres/with-database';
@@ -39,7 +40,9 @@ class PostgresPaymentSession implements PaymentSession {
     return inserted.length > 0;
   }
 
-  public async findEvent(eventId: ProviderEventId): Promise<ProviderEvent | undefined> {
+  public async findEvent(
+    eventId: ProviderEventId,
+  ): Promise<ProviderEvent | undefined> {
     const [row] = await this.transaction
       .select({
         eventId: providerEvents.eventId,
@@ -55,10 +58,11 @@ class PostgresPaymentSession implements PaymentSession {
   public async updateStatus(
     orderId: OrderId,
     status: PaymentStatus,
+    at: Timestamp,
   ): Promise<void> {
     await this.transaction
       .update(orders)
-      .set({ status, updatedAt: new Date() })
+      .set({ status, updatedAt: at.toDate() })
       .where(eq(orders.publicId, orderId));
   }
 }
