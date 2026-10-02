@@ -20,6 +20,7 @@ export const validCheckout = {
 
 export type FixtureOptions = Readonly<{
   apiKey?: string;
+  schema?: string;
   rateLimitMax?: number;
   rateLimitWindowMs?: number;
   now?: () => number;
@@ -30,8 +31,11 @@ export type StoredTable =
 
 export function createFixture(options: FixtureOptions = {}) {
   const environment = Configuration.fromEnv();
+  const scopedUrl = new URL(environment.databaseUrl);
+  if (options.schema)
+    scopedUrl.searchParams.set('options', `-c search_path=${options.schema}`);
   const configuration = Configuration.fromEnv({
-    DATABASE_URL: environment.databaseUrl,
+    DATABASE_URL: scopedUrl.toString(),
     API_KEY: options.apiKey ?? environment.apiKey,
     RATE_LIMIT_MAX: String(options.rateLimitMax ?? 100000),
     RATE_LIMIT_WINDOW_MS: String(options.rateLimitWindowMs ?? 60000),
@@ -45,6 +49,10 @@ export function createFixture(options: FixtureOptions = {}) {
   const pool = new Pool({
     connectionString: configuration.databaseUrl,
     max: 5,
+  });
+  const administration = new Pool({
+    connectionString: environment.databaseUrl,
+    max: 1,
   });
   const authorization = `Bearer ${configuration.apiKey}`;
   let closing: Promise<void> | undefined;
@@ -70,8 +78,14 @@ export function createFixture(options: FixtureOptions = {}) {
     webhook,
     order,
     prepare: async () => {
-      if (!configuration.databaseUrl.endsWith('/checkout_test'))
+      if (new URL(environment.databaseUrl).pathname !== '/checkout_test')
         throw new Error('Tests require the dedicated checkout_test database');
+      if (options.schema) {
+        await administration.query(
+          `DROP SCHEMA IF EXISTS ${options.schema} CASCADE`,
+        );
+        await administration.query(`CREATE SCHEMA ${options.schema}`);
+      }
       await migrate(pool);
       await truncate();
     },
@@ -82,6 +96,11 @@ export function createFixture(options: FixtureOptions = {}) {
       closing ??= (async () => {
         await database.close();
         await pool.end();
+        if (options.schema)
+          await administration.query(
+            `DROP SCHEMA IF EXISTS ${options.schema} CASCADE`,
+          );
+        await administration.end();
       })();
       return closing;
     },
