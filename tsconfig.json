@@ -10,7 +10,8 @@
     "resolveJsonModule": true,
     "paths": {
       "#src/*": ["./src/*"],
-      "#openapi": ["./openapi.json"]
+      "#openapi": ["./openapi.json"],
+      "#tests/*": ["./tests/*"]
     },
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
