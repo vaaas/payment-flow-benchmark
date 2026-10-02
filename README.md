@@ -27,6 +27,16 @@ Project configuration is defined via environment variables. `Configuration.ts` i
 
 Typescript is used for typechecking with maximum realistic strictness.
 
+Values that encode more than a string or number are newtypes: distinct types with a parser, so they cannot be mixed up or built from unchecked input. Branded primitives (`src/shared/domain/newtype.ts`, built on zod brands) cover:
+
+- identifiers: `OrderId` (lower-cased UUID), `BusinessOrderReference`, `IdempotencyKey`, `ProviderEventId`
+- configuration: `ApiKey`, `DatabaseUrl`, `RequestLimit`, `Milliseconds`
+- other: `CurrencyCode`, `MinorUnitDigits`, `HttpStatus`
+
+Value objects cover what needs behavior or its own JSON form: `Amount` (minor units as a bigint), `Currency`, and `Timestamp`. Each parses its wire format at the edge and serializes back to it, so the API is unchanged.
+
+Time and randomness are injected. Handlers take the time from `Clock` and new order IDs from `OrderIdGenerator`, and pass them to the stores. Adapters never call `new Date()` or `randomUUID()`.
+
 `src/infrastructure/postgres` holds cross-cutting database concerns only: the connection (`database.ts`), the schema, migrations, and a generic transaction helper. It contains no business logic.
 
 We use the Command pattern and a CQRS-like architecture to encourage single-action controllers and single-responsibility database operations.
