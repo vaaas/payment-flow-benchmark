@@ -45,7 +45,7 @@
             }
           },
           "200": {
-            "description": "Existing matching business-reference order, or the order selected by the first committed request for the supplied idempotency key. Returns current order status.",
+            "description": "Existing order with a matching business reference. Returns the current order status.",
             "content": {
               "application/json": {
                 "schema": {
@@ -85,7 +85,7 @@
             }
           },
           "503": {
-            "description": "Database unavailable or unexpected processing failure. If no database connection can be acquired, the error is Cannot connect to the database; retry later. Retry with the same submission key or provider event ID.",
+            "description": "Database unavailable or unexpected processing failure. If no database connection can be acquired, the error is Cannot connect to the database; retry later. Retry the identical request.",
             "content": {
               "application/json": {
                 "schema": {
@@ -140,20 +140,6 @@
         "security": [
           {
             "BearerApiKey": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": false,
-            "description": "Optional globally unique checkout submission key. The first committed valid request wins; subsequent valid requests return its order with 200, even if their payload differs. Failed transactions do not consume the key.",
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128,
-              "pattern": "^\\S(?:.*\\S)?$"
-            }
           }
         ]
       }
@@ -230,7 +216,7 @@
             }
           },
           "503": {
-            "description": "Database unavailable or unexpected processing failure. If no database connection can be acquired, the error is Cannot connect to the database; retry later. Retry with the same submission key or provider event ID.",
+            "description": "Database unavailable or unexpected processing failure. If no database connection can be acquired, the error is Cannot connect to the database; retry later. Retry the identical request.",
             "content": {
               "application/json": {
                 "schema": {
@@ -299,7 +285,7 @@
             }
           },
           "503": {
-            "description": "Database unavailable or unexpected processing failure. If no database connection can be acquired, the error is Cannot connect to the database; retry later. Retry with the same submission key or provider event ID.",
+            "description": "Database unavailable or unexpected processing failure. If no database connection can be acquired, the error is Cannot connect to the database; retry later. Retry the identical request.",
             "content": {
               "application/json": {
                 "schema": {

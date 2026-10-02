@@ -29,7 +29,7 @@ Typescript is used for typechecking with maximum realistic strictness.
 
 Values that encode more than a string or number are newtypes: distinct types with a parser, so they cannot be mixed up or built from unchecked input. Branded primitives (`src/shared/domain/newtype.ts`, built on zod brands) cover:
 
-- identifiers: `OrderId` (lower-cased UUID), `BusinessOrderReference`, `IdempotencyKey`, `ProviderEventId`
+- identifiers: `OrderId` (lower-cased UUID), `BusinessOrderReference`, `ProviderEventId`
 - configuration: `ApiKey`, `DatabaseUrl`, `RequestLimit`, `Milliseconds`
 - other: `CurrencyCode`, `MinorUnitDigits`, `HttpStatus`
 
@@ -56,7 +56,7 @@ Every feature is roughly organised into 4 layers:
 - application layer: where business logic happens, in one handler per command or query
 - infrastructure layer: persistence adapters (here, Postgres queries) that implement the feature's port
 
-Each feature owns a narrow persistence port in its domain layer: `CheckoutStore` and `PaymentStore` run work in a transaction through a session of single-purpose operations, and `OrderReader` is the read side. Handlers make the decisions (retry or conflict, key replay, status change, duplicate or conflicting event). Adapters only run queries. `src/bootstrap/install-postgres-stores.ts` wires the Postgres adapters.
+Each feature owns a narrow persistence port in its domain layer: `CheckoutStore` and `PaymentStore` run work in a transaction through a session of single-purpose operations, and `OrderReader` is the read side. Handlers make the decisions (retry or conflict, status change, duplicate or conflicting event). Adapters only run queries. `src/bootstrap/install-postgres-stores.ts` wires the Postgres adapters.
 
 Feature splitting is excessive for this project as arguably all 3 belong in the same cohesive feature, but the structure shows how a modular monolith could be organised.
 
@@ -80,7 +80,7 @@ Content-Type: application/json
 
 The response includes an `id` (UUID). A new order returns `201`. A retry with the same reference and a matching payload returns the existing order with `200` and creates nothing. The same reference with a different amount or currency returns `409` and leaves the existing order unchanged.
 
-Retries are recognised by `businessOrderReference`; no key is needed. An optional `Idempotency-Key` header (1–128 characters) is also accepted. The first request with a key wins; later requests with that key return its order with `200`, even if their payload differs.
+Retries are recognised by `businessOrderReference` alone. There is no idempotency key, and an `Idempotency-Key` header is ignored.
 
 ### Currency
 
