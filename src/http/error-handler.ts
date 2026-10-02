@@ -4,6 +4,16 @@ import { HttpError } from '#src/http/errors/http-error';
 import { isRespondable } from '#src/shared/response/i-respondable';
 import type { IRespondable } from '#src/shared/response/i-respondable';
 
+const clientBodyErrorTypes = [
+  'entity.parse.failed',
+  'entity.too.large',
+  'entity.verify.failed',
+  'request.aborted',
+  'request.size.invalid',
+  'charset.unsupported',
+  'encoding.unsupported',
+];
+
 export class ErrorHandler {
   public readonly handle: ErrorRequestHandler = (
     error: unknown,
@@ -20,28 +30,25 @@ export class ErrorHandler {
     if (error instanceof z.ZodError) {
       return new HttpError(400, 'Invalid request', error.issues);
     }
-    if (
-      typeof error === 'object' &&
-      error !== null &&
-      'type' in error &&
-      typeof error.type === 'string' &&
-      [
-        'entity.parse.failed',
-        'entity.too.large',
-        'entity.verify.failed',
-        'request.aborted',
-        'request.size.invalid',
-        'charset.unsupported',
-        'encoding.unsupported',
-      ].includes(error.type) &&
-      'status' in error &&
-      typeof error.status === 'number' &&
-      error.status >= 400 &&
-      error.status < 500
-    ) {
+    if (error instanceof URIError) {
+      return new HttpError(400, 'Invalid request');
+    }
+    if (this.isClientBodyError(error)) {
       return new HttpError(error.status, 'Invalid JSON body');
     }
     console.error(error);
     return new HttpError(503, 'Processing failed; retry the identical request');
+  }
+
+  private isClientBodyError(
+    error: unknown,
+  ): error is { status: number; type?: string; expose?: boolean } {
+    if (typeof error !== 'object' || error === null) return false;
+    if (!('status' in error) || typeof error.status !== 'number') return false;
+    if (error.status < 400 || error.status >= 500) return false;
+    const type = 'type' in error ? error.type : undefined;
+    if (typeof type === 'string' && clientBodyErrorTypes.includes(type))
+      return true;
+    return 'expose' in error && error.expose === true;
   }
 }
