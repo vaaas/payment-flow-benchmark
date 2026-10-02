@@ -1,56 +1,110 @@
 # Payment flow benchmark
 
-Requires Docker with Compose, or Podman with a Compose provider; no host Node.js or PostgreSQL. All tooling runs in containers. Local `.env`, `.env.*`, PEM and key files are excluded from image builds.
+## Requirements
 
-- `./run dev`: build, start PostgreSQL, apply migrations, and serve at `http://localhost:3000`. Source files are mounted for live reload; restart after dependency or configuration changes.
-- `./run test`: compile and run Jest in a separate Compose project with PostgreSQL database `checkout_test`.
-- `./run format` / `./run format:check`: apply or check Prettier formatting, including the shell helper.
-- `./run npm ...`: forward arguments to npm inside the container, for example `./run npm install lodash` or `./run npm run build`.
+- docker + compose
+- podman + compose
+
+Host does not need node.js, psql, or dev tooling; workloads exist entirely in containers.
+
+## Usage
+
+- `./run dev`: start the dev server at `http://localhost:3000`
+- `./run test`: compile and run the test suite
+- `./run format`: apply `prettier` formatting
+- `./run format:check`: read-only formatting check
+- `./run npm ...`: forward arguments to npm inside the container, e.g. `./run npm i`
 - `./run build`: build the application image.
-- `./run stop`: remove service containers and networks, preserving development database data.
+- `./run stop`: remove service containers and networks
 
-[compose.yaml](compose.yaml) defines services, database health checks, ports, and volumes. Test and tooling services use separate profiles. Use `CONTAINER_ENGINE=podman` to select Podman, or `API_PORT=3001` to change the local API port. You can also use Compose directly, for example `docker compose up --build api`. Container-installed dependencies are bind-mounted at `./node_modules` for local editors; dependency installation runs before dev and npm/tooling commands. npm commands run against the mounted workspace, so package and lockfile changes persist. `./run test` supplies its own database; `./run npm test` does not. Credentials are local benchmark defaults. Concurrent test runs share the test database and must be serialized.
+## Architecture
 
-Project imports use `#src/...` and `#openapi`; relative imports are forbidden by ESLint. Run `./run npm run lint` explicitly; builds and tests also enforce it. Aliases resolve in tsx, Jest, and compiled Node.js.
+Services and volumes for our containers are defined in `compose.yaml`
 
-TypeScript checks source and tests with strict typing, checked indexed access, exact optional properties, unused imports/locals/parameters, overrides, and control-flow checks. Compiler errors prevent emission. Dependency declarations are skipped with `skipLibCheck`; `node_modules`, build output, and coverage are excluded as project inputs.
+The main application entrypoing is in `src/main.ts`. We follow an object-oriented style with particular emphasis on the single-responsibility principle, the inversion of control, and immutability.
 
-Environment variables are read only by the immutable `Configuration` class via `Configuration.fromEnv(env = process.env)`. It validates the PostgreSQL URL; service startup, migrations, and tests use the same configuration object. ESLint forbids direct `process.env` access elsewhere.
+Project configuration is defined via environment variables. `Configuration.ts` is the only file allowed to read `process.env` directly.
+
+Typescript is used for typechecking with maximum realistic strictness.
+
+Database initialisation is encapsulated under `infrastructure/postgres/database.ts`
+
+We use the Command pattern and a CQRS-like architecture to encourage single-action controllers and single-responsibility database operations.
+
+Autowiring dependency injection is supported via the in-house DI framework, found in `src/application/dependency-injection/container.ts`. Object and service creation is encouraged to be autowired.
+
+Barebones bearer authentication is provided as a sample in `src/http/authentication/bearer-authentication.ts`.
+
+Barebones rate-limitting is provided as a sample in `src/http/rate-limiting/rate-limiter.ts`. It is global, not keyed by consumer, and uses a primitive windowing strategy.
+
+Application features are organised in the `src/features` directory. We have 3 features: `checkout`, `orders`, and `payments`. Each feature defines an installer, allowing for straightforward registration of its behavior on our `App` by changing a single line of code.
+
+Every feature is roughly organised into 3 layers:
+- domain layer: defines domain objects or data transfer objects (i.e. data structures)
+- http layer: the http port of our application (as opposed to, say, websocket ports)
+- application layer: where business logic happens
+
+Feature splitting is excessive for this project as arguably all 3 belong in the same cohesive feature, but the structure shows how a modular monolith could be organised.
 
 ## API
 
-Private endpoints share an in-memory fixed-window limit: 100 authenticated requests per 60 seconds for the single shared API key. Configure `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_MS`. Excess requests return 429 with `Retry-After` in seconds before dispatch or database access. Requests reaching the limiter count even if validation or processing fails, including idempotent retries; rejected requests do not extend the window. Authentication failures, webhooks, and OpenAPI are exempt. State is local to one process and resets on restart; fixed windows allow bursts around their boundary. Use shared limits and separate provider/unauthenticated traffic limits before production. Integration tests raise the limit explicitly so they can test database concurrency independently.
+Defined in our OpenAPI spec, but very roughly as follows:
 
-Checkout submissions optionally accept `Idempotency-Key` (1–128 characters, no leading/trailing whitespace). Keys are globally unique for checkout in this single-identity sample. The first committed valid request wins; an identical or changed valid submission with the same key returns that order’s current state with 200 without writing. Validation and authentication still run on retries. The key-to-order link and checkout are committed together; transaction failure releases the key for retry. A PostgreSQL advisory transaction lock serializes requests for the same key, with a unique key constraint as a backstop. Without a key, business-reference retry/conflict rules apply. Different keys can point to the same matching business reference. Keys have no expiry or cleanup. Webhooks already use their provider event IDs for idempotency.
 
-Checkout creation and order lookup require `Authorization: Bearer benchmark-api-key`. Set `API_KEY` to override the sample shared key. Missing or invalid credentials return 401 with `WWW-Authenticate: Bearer`. Webhooks and OpenAPI remain public. This sample has one shared identity; it does not implement merchant authorization, key rotation, or merchant-level permissions.
+### Creating a checkout
 
-The [OpenAPI 3.1 spec](openapi.json) is served at `GET /openapi.json`, with schemas, examples, validation rules, and retry/conflict behavior. Import it into an OpenAPI client or editor.
+```
+POST /checkout-intents
+Authorization: Bearer your-api-key
+Content-Type: application/json
+Idempotency-Key: some-contrived-key
 
-- `POST /checkout-intents`: `{"businessOrderReference":"merchant-123","amountMinor":"1999","currency":"EUR"}`. Returns 201 for creation, 200 for matching retries, with `{id,businessOrderReference,amountMinor,currency,status,createdAt,updatedAt}`. Timestamps are UTC ISO strings. Changed amount/currency returns 409 unless an already committed `Idempotency-Key` selects the first request’s order.
-- `POST /webhooks/payment`: `{"eventId":"evt-1","orderId":"<returned UUID>","outcome":"succeeded"}`. Outcome is `failed` or `succeeded`. Returns 200 with `{"duplicate":false}` after commit, or `{"duplicate":true}` for an identical committed event. Changed event payload returns 409; unknown order returns 404 without consuming the event ID. An unknown order is checked first, so it returns 404 even for a reused event ID.
-- `GET /orders/:id`: returns the order, or 404. Malformed requests return 400; unexpected processing failures return 503. JSON objects reject unknown fields. Bodies are limited to 16 KiB (413); unsupported charset or encoding returns 415. Identifiers reject NUL and malformed Unicode before PostgreSQL is called.
+{
+    "businessOrderReference": "merchant-123",
+    "amountMinor": "1999",
+    "currency": "EUR"
+}
+```
 
-Amounts are canonical positive decimal **strings of minor units**, stored as PostgreSQL `bigint` (maximum 9223372036854775807), avoiding JavaScript floating-point loss. Clients must know the currency's minor-unit exponent. Currency accepts three uppercase letters; this benchmark does not validate ISO membership. References and event IDs are case-sensitive, 1–128 characters, without leading/trailing whitespace. References are globally unique for this single-merchant service. Orders have serial integer primary keys and a separate unique public UUID, returned as API `id`. Events have serial integer primary keys, a unique provider `eventId`, and an integer order foreign key. Webhooks identify orders by public UUID; the store resolves this to the internal key inside the transaction. Internal keys are never returned. Event IDs are globally unique for one simulated provider.
+The response includes an `id` (UUID).
+
+Note that we accept an optional idempotency key, allowed to be any contrived string defined by our consumer. For example, one may send `<userId>-<YYYY-MM-dd>`. This is a safety measure to prevent double writes. In the case of double writes, the first one simply wins.
+
+### Simulating the provider's payment via webhook:
+
+```
+POST /webhooks/payment
+Content-Type: application/json
+
+{
+    {
+        "eventId": "evt-1",
+        "orderId": <the-previous-uuid>,
+        "outcome": "succeeded"
+    }
+}
+```
+
+### Reading the result
+
+```
+GET /orders/<the-previous-uuid>
+Authorization: your-api-key
+```
 
 ## Correctness and transactions
 
-Orders start `pending`. Allowed changes: `pending → failed`, `pending → succeeded`, `failed → succeeded`; repeated statuses are no-ops. Success is permanent. Failure may be corrected by later success, even with an earlier provider timestamp: outcomes have precedence, rather than arrival-time or timestamp precedence. Every distinct valid event is retained, including ignored failures after success. No provider timestamps are needed. Identical payload means the validated fields match; JSON key order is irrelevant.
+Orders start `pending`.
 
-Checkout runs insert-on-conflict and payload comparison in one transaction. PostgreSQL's unique reference constraint chooses one winner under concurrency. The subsequent read at READ COMMITTED sees the committed winner; a mismatch rolls back without changing it.
+Allowed transitions:
+- `pending → failed`
+- `pending → succeeded`
+- `failed → succeeded`
 
-Each webhook locks its order with `SELECT FOR UPDATE`, inserts its event using the unique event ID, compares payload on conflict, and updates status in the **same transaction**. Locking before insertion also avoids foreign-key lock upgrade deadlocks between events on one order. Different orders can process concurrently. An event ID reused for another existing order or outcome is rejected, never reapplied. The immutable `Order` chooses status changes in the application while its row is locked. The store updates only status and `updatedAt`; checkout fields have no update operation. PostgreSQL retains uniqueness, foreign keys, and value checks, but no transition trigger. Direct SQL writers can bypass application policy and must use the same service logic to preserve these guarantees. `updatedAt` changes only when the order changes, not on retries or ignored events.
+Repeated statuses are no-ops. Success is permanent (no transition out of success exists). Failure may be corrected by later success, even with an earlier provider timestamp. Every distinct valid event is retained, including ignored failures after success. Identical payload means the validated fields match, regardless of JSON key order.
 
-HTTP 200 is sent only after transaction commit. Failures before commit roll back both event receipt and status. A provider can retry the identical event after 503 or an interrupted connection. If commit succeeds but the response is lost (or commit acknowledgement is ambiguous), the retry sees the stored event and returns duplicate success. A webhook arriving before checkout commits may receive 404 and should be retried after checkout exists. 409 is a payload conflict requiring correction, not blind retry.
+Checkouts insert-on-conflict and perform payload comparison in one transaction. We use a unique reference constraint to choose one winder under concurrent requests. The next read sees the winner. Mismatches roll back.
 
-## Verification and limitations
+Each webhook locks its order with `SELECT FOR UPDATE`, inserts its event using the unique event ID, compares payload on conflict, and updates status in the same transaction. Locking before insertion also avoids foreign-key deadlocks between events on one order.
 
-`./run test` includes HTTP tests with mocked persistence, plus real PostgreSQL integration tests for concurrent checkout conflicts, repeated and conflicting event IDs, out-of-order outcomes, permanent success, integer key mapping, timestamp behavior, exact bigint amounts, and rollback after an injected database update failure. The database is deliberately real in concurrency tests: a network/database mock cannot demonstrate unique constraints or row locks. Tests use Supertest's local HTTP server and the application's real bus, event handlers and store. The single initial SQL migration runs transactionally under an advisory lock; repeat execution is safe. Migration history is squashed for this benchmark: databases created from earlier revisions need recreation rather than an upgrade. Serial sequences may have gaps.
-
-The composition root (`src/main.ts`) configures a `Container` with separate class-to-provider and class-to-instance maps. `register(Class, provider)` supplies explicit bindings; `registerInstance(Class, instance)` supplies existing objects. `get(Class)` caches one instance per container and can autowire a class through `static provide(container): Class`, the static-side `IAutowire<Class>` contract. `Container.install(container => container)` composes registration functions. `App.install(app => app)` installs a complete feature. `src/bootstrap/install-features.ts` composes feature installers; each registers its dependencies, installs its bus events, and mounts its HTTP routes on `app.routes` before shared fallback/error middleware. `Bus.install(bus => bus)` batches each feature’s event registrations. Installers are synchronous and propagate errors; registrations made before an installer throws remain in place. Duplicate registrations, missing providers and circular dependencies fail clearly; failed resolutions may be retried. Configuration, the PostgreSQL store, event handlers and `App` provide themselves; the root binds abstract `OrderStore`; the autowired `Database` object owns its private mutable pool reference, then installs the features on `App`. The bus is a shared autowired singleton. Providers are synchronous, with no scopes or automatic disposal; the root closes `Database` on shutdown. Pool initialization is lazy and shared across concurrent requests. A failed connection returns 503 with `Cannot connect to the database; retry later`, disposes a failed initialization, and allows the next request to try again. Pool acquisition is bounded to two seconds. Idle and active client errors have listeners so they cannot become fatal unhandled events; failed clients are replaced by pg. Each store operation borrows and releases one client, with transaction boundaries unchanged.
-
-`src/features/checkout`, `src/features/payments`, and `src/features/orders` each own their domain requests and HTTP route classes; each request object owns its validation schema and a static `from(unknown)` constructor. Private constructors prevent unparsed requests from being instantiated. HTTP handlers pass bodies or parameters to these constructors, dispatch the immutable command or query, and send the response. A single generic `Bus` registers event handlers with `bus.on(EventType, handler).on(OtherEventType, otherHandler)`. `dispatch<T = void>(event: Event<T>): Promise<T>` infers the result from the event; feature handlers delegate to the store. Duplicate registrations fail immediately and dispatching an unregistered event rejects. The immutable `Order` owns checkout matching and payment transition policy. Shared HTTP handling lives in `src/http`, and PostgreSQL adapters and migrations in `src/infrastructure/postgres`. Errors can implement `IRespondable.response()` to supply their status and serialized body; middleware recognizes that contract, adapts external validation errors, and uses a generic 503 for unexpected errors.
-
-There is no UI, external payment call, background queue, or deployment infrastructure. A dedicated load generator and measured latency/throughput results are unfinished; concurrent correctness tests are not performance measurements. A next step would be a containerized load test with fixed hardware, realistic traffic, pool sizes and percentile latency reporting. Connection-loss-at-commit is explained through transaction/idempotency behavior but not fault-injected; add a PostgreSQL network proxy to verify that path.
-
-Before production: scope references by merchant and event IDs by provider, validate supported currencies, add merchant authentication/authorization and webhook signatures, protect secrets, bound database statement/lock durations, share rate limits across instances, instrument errors/latency/lock contention, document provider retry behavior, and add backup/restore and migration upgrade checks. Those are intentionally not built here. For ORM API details see the [Drizzle PostgreSQL documentation](https://orm.drizzle.team/docs/get-started/postgresql-existing).
+Different orders can process concurrently. An event ID reused for another existing order or outcome is rejected, never reapplied. The immutable `Order` chooses status changes in the application while its row is locked. The store updates only status and `updatedAt`; checkout fields have no update operation. The database enforces uniqueness, foreign keys, and value checks, but no transition trigger.
