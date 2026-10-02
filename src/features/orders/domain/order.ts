@@ -1,7 +1,10 @@
+import { z } from 'zod';
 import type { Checkout } from '#src/features/checkout/domain/create-checkout';
 import type { PaymentOutcome } from '#src/features/payments/domain/receive-webhook';
 
-export type PaymentStatus = 'pending' | PaymentOutcome;
+export const paymentStatusSchema = z.enum(['pending', 'failed', 'succeeded']);
+
+export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
 
 export type OrderSnapshot = Checkout &
   Readonly<{

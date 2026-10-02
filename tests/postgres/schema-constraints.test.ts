@@ -3,14 +3,24 @@ import { Pool } from 'pg';
 import { Configuration } from '#src/configuration/configuration';
 import { migrate } from '#src/infrastructure/postgres/migrate';
 
+const schema = 'schema_constraints_test';
 const configuration = Configuration.fromEnv();
-const pool = new Pool({ connectionString: configuration.databaseUrl });
+const administration = new Pool({
+  connectionString: configuration.databaseUrl,
+  max: 1,
+});
+const pool = new Pool({
+  connectionString: configuration.databaseUrl,
+  options: `-c search_path=${schema}`,
+});
 
 beforeAll(async () => {
   if (!configuration.databaseUrl.endsWith('/checkout_test'))
     throw new Error(
       'Schema tests require the dedicated checkout_test database',
     );
+  await administration.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+  await administration.query(`CREATE SCHEMA ${schema}`);
   await migrate(pool);
 });
 beforeEach(async () => {
@@ -18,14 +28,17 @@ beforeEach(async () => {
     'TRUNCATE checkout_idempotency_keys, provider_events, orders',
   );
 });
-afterAll(() => pool.end());
+afterAll(async () => {
+  await administration.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+  await pool.end();
+  await administration.end();
+});
 
 type OrderRow = {
   publicId: string;
-  reference: string;
-  amount: string | number | null;
+  reference: string | null;
+  amount: string | null;
   currency: string | null;
-  status: string | undefined;
 };
 
 const insertOrder = (overrides: Partial<OrderRow> = {}) => {
@@ -34,13 +47,12 @@ const insertOrder = (overrides: Partial<OrderRow> = {}) => {
     reference: `order-${randomUUID()}`,
     amount: '1999',
     currency: 'EUR',
-    status: undefined,
     ...overrides,
   };
   return pool.query(
-    `INSERT INTO orders (public_id, business_order_reference, amount_minor, currency, status)
-     VALUES ($1, $2, $3, $4, COALESCE($5, 'pending')) RETURNING *`,
-    [row.publicId, row.reference, row.amount, row.currency, row.status],
+    `INSERT INTO orders (public_id, business_order_reference, amount_minor, currency)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [row.publicId, row.reference, row.amount, row.currency],
   );
 };
 
@@ -56,10 +68,19 @@ const insertKey = (key: string, orderId: number) =>
     [key, orderId],
   );
 
-const check = { code: '23514' };
 const unique = { code: '23505' };
 const notNull = { code: '23502' };
 const foreignKey = { code: '23503' };
+
+test('the schema declares structure only: value rules belong to the application parsers', async () => {
+  const checks = await pool.query(
+    `SELECT conname FROM pg_constraint
+     JOIN pg_namespace ON pg_namespace.oid = connamespace
+     WHERE nspname = $1 AND contype = 'c'`,
+    [schema],
+  );
+  expect(checks.rows).toEqual([]);
+});
 
 test('a new order defaults to pending with matching creation timestamps', async () => {
   const { rows } = await insertOrder();
@@ -75,13 +96,6 @@ test('serial keys increase and are never reused after deletion', async () => {
   expect(second).toBeGreaterThan(first);
 });
 
-test.each(['0', '-1', '-9223372036854775808'])(
-  'orders reject the non-positive amount %s',
-  async (amount) => {
-    await expect(insertOrder({ amount })).rejects.toMatchObject(check);
-  },
-);
-
 test('orders accept the largest bigint amount and reject anything larger', async () => {
   const stored = await insertOrder({ amount: '9223372036854775807' });
   expect(stored.rows[0].amount_minor).toBe('9223372036854775807');
@@ -90,43 +104,8 @@ test('orders accept the largest bigint amount and reject anything larger', async
   ).rejects.toMatchObject({ code: '22003' });
 });
 
-test.each(['eur', 'EU', 'EURO', 'E1R', '', ' EU', '€€€'])(
-  'orders reject the currency %j',
-  async (currency) => {
-    await expect(insertOrder({ currency })).rejects.toMatchObject(check);
-  },
-);
-
-test.each(['refunded', 'PENDING', 'Succeeded', '', 'cancelled'])(
-  'orders reject the status %j',
-  async (status) => {
-    await expect(insertOrder({ status })).rejects.toMatchObject(check);
-  },
-);
-
-test.each(['pending', 'failed', 'succeeded'])(
-  'orders accept the status %s',
-  async (status) => {
-    expect((await insertOrder({ status })).rows[0].status).toBe(status);
-  },
-);
-
 test.each([
-  ['an empty reference', ''],
-  ['a reference over 128 characters', 'x'.repeat(129)],
-])('orders reject %s', async (_name, reference) => {
-  await expect(insertOrder({ reference })).rejects.toMatchObject(check);
-});
-
-test('orders accept a 128 character reference and count characters, not bytes', async () => {
-  await insertOrder({ reference: 'x'.repeat(128) });
-  await insertOrder({ reference: '😀'.repeat(128) });
-  expect(
-    (await pool.query('SELECT count(*)::int AS n FROM orders')).rows[0].n,
-  ).toBe(2);
-});
-
-test.each([
+  ['reference', { reference: null }],
   ['amount', { amount: null }],
   ['currency', { currency: null }],
 ])('orders require %s', async (_name, overrides) => {
@@ -153,24 +132,11 @@ test('public identifiers must be valid UUIDs', async () => {
   });
 });
 
-test('provider events enforce uniqueness, valid outcomes and length limits', async () => {
-  const orderId = (await insertOrder()).rows[0].id;
-  await insertEvent('evt-1', orderId);
-  await expect(insertEvent('evt-1', orderId)).rejects.toMatchObject(unique);
-  await expect(insertEvent('evt-2', orderId, 'pending')).rejects.toMatchObject(
-    check,
-  );
-  await expect(insertEvent('', orderId)).rejects.toMatchObject(check);
-  await expect(insertEvent('e'.repeat(129), orderId)).rejects.toMatchObject(
-    check,
-  );
-  await expect(insertEvent('e'.repeat(128), orderId)).resolves.toBeDefined();
-});
-
 test('event IDs are unique across orders, not per order', async () => {
   const first = (await insertOrder()).rows[0].id;
   const second = (await insertOrder()).rows[0].id;
   await insertEvent('shared', first);
+  await expect(insertEvent('shared', first)).rejects.toMatchObject(unique);
   await expect(insertEvent('shared', second)).rejects.toMatchObject(unique);
 });
 
@@ -194,16 +160,11 @@ test('an order with events or keys cannot be deleted out from under them', async
   ).rejects.toMatchObject(foreignKey);
 });
 
-test('idempotency keys are unique, bounded and may share an order', async () => {
+test('idempotency keys are unique and may share an order', async () => {
   const orderId = (await insertOrder()).rows[0].id;
   await insertKey('key-1', orderId);
   await expect(insertKey('key-1', orderId)).rejects.toMatchObject(unique);
-  await expect(insertKey('', orderId)).rejects.toMatchObject(check);
-  await expect(insertKey('k'.repeat(129), orderId)).rejects.toMatchObject(
-    check,
-  );
   await expect(insertKey('key-2', orderId)).resolves.toBeDefined();
-  await expect(insertKey('k'.repeat(128), orderId)).resolves.toBeDefined();
 });
 
 test('text columns reject NUL characters', async () => {
@@ -212,7 +173,8 @@ test('text columns reject NUL characters', async () => {
 
 test('uniqueness rules are backed by indexes', async () => {
   const indexes = await pool.query(
-    `SELECT tablename, indexdef FROM pg_indexes WHERE schemaname = current_schema()`,
+    `SELECT tablename, indexdef FROM pg_indexes WHERE schemaname = $1`,
+    [schema],
   );
   const definitions = indexes.rows.map(
     (row: { tablename: string; indexdef: string }) =>

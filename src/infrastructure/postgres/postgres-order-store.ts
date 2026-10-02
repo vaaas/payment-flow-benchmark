@@ -6,7 +6,7 @@ import { eq, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { Checkout } from '#src/features/checkout/domain/create-checkout';
 import { CheckoutConflict } from '#src/features/checkout/domain/checkout-conflict';
-import { Order } from '#src/features/orders/domain/order';
+import { Order, paymentStatusSchema } from '#src/features/orders/domain/order';
 import { OrderNotFound } from '#src/features/orders/domain/order-not-found';
 import type { OrderStore } from '#src/features/orders/domain/order-store';
 import type { ProviderEvent } from '#src/features/payments/domain/receive-webhook';
@@ -16,16 +16,20 @@ import {
   providerEvents,
   checkoutIdempotencyKeys,
 } from '#src/infrastructure/postgres/schema';
-const toOrder = (row: typeof orders.$inferSelect): Order =>
-  new Order({
+const toOrder = (row: typeof orders.$inferSelect): Order => {
+  const status = paymentStatusSchema.safeParse(row.status);
+  if (!status.success)
+    throw new Error(`Stored order ${row.publicId} has an invalid status`);
+  return new Order({
     id: row.publicId,
     businessOrderReference: row.businessOrderReference,
     currency: row.currency,
-    status: row.status,
+    status: status.data,
     amountMinor: row.amountMinor.toString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   });
+};
 
 export class PostgresOrderStore implements OrderStore {
   public static provide(container: Container): PostgresOrderStore {
