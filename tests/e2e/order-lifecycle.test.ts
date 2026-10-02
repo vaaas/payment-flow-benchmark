@@ -90,6 +90,22 @@ test.each([
   },
 );
 
+test('a business order reference is unique across the whole service, whoever submits it', async () => {
+  const first = await fixture.checkout().set('Idempotency-Key', 'caller-a');
+  const matching = await fixture.checkout().set('Idempotency-Key', 'caller-b');
+  const changed = await fixture
+    .checkout({ ...validCheckout, amountMinor: '2000' })
+    .set('Idempotency-Key', 'caller-c');
+  const unkeyed = await fixture.checkout({ ...validCheckout, currency: 'USD' });
+  expect(first.status).toBe(201);
+  expect(matching.status).toBe(200);
+  expect(matching.body.id).toBe(first.body.id);
+  expect(changed.status).toBe(409);
+  expect(unkeyed.status).toBe(409);
+  expect(await fixture.count('orders')).toBe(1);
+  expect((await fixture.order(first.body.id)).body).toEqual(first.body);
+});
+
 const transitions: [string, string[], string][] = [
   ['a single failure', ['failed'], 'failed'],
   ['a single success', ['succeeded'], 'succeeded'],
