@@ -1,20 +1,27 @@
+import { OrderReader } from '#src/features/orders/domain/order-reader';
 import { Database } from '#src/infrastructure/postgres/database';
 import { installFeatures } from '#src/bootstrap/install-features';
-import { OrderStore } from '#src/features/orders/domain/order-store';
 import { Container } from '#src/application/dependency-injection/container';
 import request from 'supertest';
 import { Configuration } from '#src/configuration/configuration';
 import { Pool } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { App } from '#src/http/app';
-import { PostgresOrderStore } from '#src/infrastructure/postgres/postgres-order-store';
+import { installPostgresStores } from '#src/bootstrap/install-postgres-stores';
 import { migrate } from '#src/infrastructure/postgres/migrate';
 const configuration = Configuration.fromEnv();
 const pool = new Pool({ connectionString: configuration.databaseUrl, max: 20 });
 const container = new Container()
   .registerInstance(Configuration, configuration)
-  .register(OrderStore, PostgresOrderStore);
-const store = container.get(OrderStore);
+  .install(installPostgresStores);
+const orderReader = container.get(OrderReader);
+const store = {
+  get: async (id: string) => {
+    const order = await orderReader.find(id);
+    if (!order) throw new Error(`Expected order ${id} to exist`);
+    return order;
+  },
+};
 const application = container.get(App).install(installFeatures);
 const app = application.http;
 const payload = {

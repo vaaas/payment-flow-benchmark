@@ -1,5 +1,5 @@
 import { Event } from '#src/application/event';
-import type { OrderStore } from '#src/features/orders/domain/order-store';
+import type { Order } from '#src/features/orders/domain/order';
 import { z } from 'zod';
 import { Currency } from '#src/shared/domain/currency';
 import { identifierSchema } from '#src/shared/domain/identifier-schema';
@@ -10,9 +10,9 @@ export type Checkout = Readonly<{
   currency: Currency;
 }>;
 
-export class CreateCheckout extends Event<
-  Awaited<ReturnType<OrderStore['create']>>
-> {
+export type CheckoutResult = Readonly<{ order: Order; created: boolean }>;
+
+export class CreateCheckout extends Event<CheckoutResult> {
   private static readonly schema = z.strictObject({
     businessOrderReference: identifierSchema,
     amountMinor: z

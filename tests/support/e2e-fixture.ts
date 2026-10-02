@@ -5,12 +5,11 @@ import { Pool } from 'pg';
 import { Container } from '#src/application/dependency-injection/container';
 import { installFeatures } from '#src/bootstrap/install-features';
 import { Configuration } from '#src/configuration/configuration';
-import { OrderStore } from '#src/features/orders/domain/order-store';
 import { App } from '#src/http/app';
 import { RateLimiter } from '#src/http/rate-limiting/rate-limiter';
 import { Database } from '#src/infrastructure/postgres/database';
 import { migrate } from '#src/infrastructure/postgres/migrate';
-import { PostgresOrderStore } from '#src/infrastructure/postgres/postgres-order-store';
+import { installPostgresStores } from '#src/bootstrap/install-postgres-stores';
 
 export const validCheckout = {
   businessOrderReference: 'merchant-123',
@@ -43,7 +42,7 @@ export function createFixture(options: FixtureOptions = {}) {
   const container = new Container()
     .registerInstance(Configuration, configuration)
     .registerInstance(RateLimiter, new RateLimiter(configuration, options.now))
-    .register(OrderStore, PostgresOrderStore);
+    .install(installPostgresStores);
   const app = container.get(App).install(installFeatures).http;
   const database = container.get(Database);
   const pool = new Pool({

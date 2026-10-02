@@ -1,11 +1,10 @@
 import { installFeatures } from '#src/bootstrap/install-features';
+import { installPostgresStores } from '#src/bootstrap/install-postgres-stores';
 import { Container } from '#src/application/dependency-injection/container';
-import { OrderStore } from '#src/features/orders/domain/order-store';
 import { Database } from '#src/infrastructure/postgres/database';
 import { App } from '#src/http/app';
-import { PostgresOrderStore } from '#src/infrastructure/postgres/postgres-order-store';
 
-const container = new Container().register(OrderStore, PostgresOrderStore);
+const container = new Container().install(installPostgresStores);
 const server = container
   .get(App)
   .install(installFeatures)

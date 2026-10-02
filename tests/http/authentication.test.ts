@@ -4,7 +4,7 @@ import { Container } from '#src/application/dependency-injection/container';
 import { installFeatures } from '#src/bootstrap/install-features';
 import { Configuration } from '#src/configuration/configuration';
 import { Order } from '#src/features/orders/domain/order';
-import { OrderStore } from '#src/features/orders/domain/order-store';
+import { createStoreFakes } from '#tests/support/store-fakes';
 import { App } from '#src/http/app';
 
 const payload = {
@@ -24,14 +24,10 @@ const configuration = Configuration.fromEnv({
   DATABASE_URL: 'postgresql://postgres:benchmark@database:5432/checkout_test',
   API_KEY: 'sample-private-key',
 });
-const store: jest.Mocked<OrderStore> = {
-  create: jest.fn(),
-  get: jest.fn(),
-  receive: jest.fn(),
-};
+const stores = createStoreFakes();
 const container = new Container()
   .registerInstance(Configuration, configuration)
-  .registerInstance(OrderStore, store);
+  .install(stores.install);
 const app = container.get(App).install(installFeatures).http;
 beforeEach(() => jest.resetAllMocks());
 
@@ -57,16 +53,16 @@ test.each([
         error: 'Invalid or missing bearer API key',
       });
     }
-    expect(store.create).not.toHaveBeenCalled();
-    expect(store.get).not.toHaveBeenCalled();
+    expect(stores.checkout.transaction).not.toHaveBeenCalled();
+    expect(stores.orders.find).not.toHaveBeenCalled();
   },
 );
 
 test.each(['Bearer', 'bearer'])(
   'private routes accept the configured key with scheme %s',
   async (scheme) => {
-    store.create.mockResolvedValue({ order, created: true });
-    store.get.mockResolvedValue(order);
+    stores.checkout.transaction.mockResolvedValue({ order, created: true });
+    stores.orders.find.mockResolvedValue(order);
     const authorization = `${scheme} ${configuration.apiKey}`;
     expect(
       (
@@ -85,7 +81,7 @@ test.each(['Bearer', 'bearer'])(
 );
 
 test('provider webhooks and OpenAPI remain public with private-route security documented', async () => {
-  store.receive.mockResolvedValue({ duplicate: false });
+  stores.payments.transaction.mockResolvedValue({ duplicate: false });
   expect(
     (
       await request(app).post('/webhooks/payment').send({
@@ -95,7 +91,7 @@ test('provider webhooks and OpenAPI remain public with private-route security do
       })
     ).status,
   ).toBe(200);
-  expect(store.receive).toHaveBeenCalledTimes(1);
+  expect(stores.payments.transaction).toHaveBeenCalledTimes(1);
   const specification = await request(app).get('/openapi.json');
   expect(specification.status).toBe(200);
   expect(specification.body.security).toEqual([]);

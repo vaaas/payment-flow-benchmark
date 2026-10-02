@@ -9,23 +9,18 @@ import type {
 import request from 'supertest';
 import { App } from '#src/http/app';
 import { Bus } from '#src/application/bus';
-import { OrderStore } from '#src/features/orders/domain/order-store';
-import { OrderNotFound } from '#src/features/orders/domain/order-not-found';
+import { createStoreFakes } from '#tests/support/store-fakes';
 import { Order } from '#src/features/orders/domain/order';
 import { CreateCheckout } from '#src/features/checkout/domain/create-checkout';
 import { ReceiveWebhook } from '#src/features/payments/domain/receive-webhook';
 import { GetOrder } from '#src/features/orders/domain/get-order';
-const store: jest.Mocked<OrderStore> = {
-  create: jest.fn(),
-  receive: jest.fn(),
-  get: jest.fn(),
-};
+const stores = createStoreFakes();
 const configuration = Configuration.fromEnv({
   DATABASE_URL: 'postgresql://postgres:benchmark@database:5432/checkout_test',
 });
 const container = new Container()
   .registerInstance(Configuration, configuration)
-  .registerInstance(OrderStore, store);
+  .install(stores.install);
 const bus = container.get(Bus);
 const application = container.get(App).install(installFeatures);
 const app = application.http;
@@ -54,10 +49,10 @@ test('invalid JSON and unknown fields never reach persistence', async () => {
         })
     ).status,
   ).toBe(400);
-  expect(store.create).not.toHaveBeenCalled();
+  expect(stores.checkout.transaction).not.toHaveBeenCalled();
 });
 test('unknown order and malformed UUID produce distinct responses', async () => {
-  store.get.mockRejectedValue(new OrderNotFound());
+  stores.orders.find.mockResolvedValue(undefined);
   expect(
     (
       await request(app)
@@ -75,7 +70,7 @@ test('unknown order and malformed UUID produce distinct responses', async () => 
 });
 test('webhook acknowledgement waits for persistence completion', async () => {
   let complete!: (value: { duplicate: boolean }) => void;
-  store.receive.mockReturnValue(
+  stores.payments.transaction.mockReturnValue(
     new Promise((resolve) => {
       complete = resolve;
     }),
@@ -88,7 +83,7 @@ test('webhook acknowledgement waits for persistence completion', async () => {
       outcome: 'failed',
     })
     .then((result) => result);
-  while (!store.receive.mock.calls.length)
+  while (!stores.payments.transaction.mock.calls.length)
     await new Promise((resolve) => setTimeout(resolve, 5));
   complete({ duplicate: false });
   expect((await response).status).toBe(200);
@@ -109,7 +104,7 @@ const order = new Order({
 });
 
 test('checkout route dispatches a parsed immutable domain command', async () => {
-  store.create.mockResolvedValue({ order, created: true });
+  stores.checkout.transaction.mockResolvedValue({ order, created: true });
   const dispatch = jest.spyOn(bus, 'dispatch');
   const response = await request(app)
     .post('/checkout-intents')
@@ -128,17 +123,14 @@ test('checkout route dispatches a parsed immutable domain command', async () => 
     currency: Currency.of(checkoutPayload.currency),
   });
   expect(command.idempotencyKey).toBe('checkout-submission');
-  expect(store.create).toHaveBeenCalledWith(
-    { ...checkoutPayload, currency: Currency.of(checkoutPayload.currency) },
-    'checkout-submission',
-  );
+  expect(stores.checkout.transaction).toHaveBeenCalledTimes(1);
   expect(Object.isFrozen(command)).toBe(true);
   expect(Object.isFrozen(command.payload)).toBe(true);
 });
 
 test('webhook route dispatches a parsed immutable domain command', async () => {
   const payload = { eventId: 'event-1', orderId: order.id, outcome: 'failed' };
-  store.receive.mockResolvedValue({ duplicate: false });
+  stores.payments.transaction.mockResolvedValue({ duplicate: false });
   const dispatch = jest.spyOn(bus, 'dispatch');
   const response = await request(app).post('/webhooks/payment').send(payload);
 
@@ -154,7 +146,7 @@ test('webhook route dispatches a parsed immutable domain command', async () => {
 });
 
 test('order route dispatches a parsed immutable domain query', async () => {
-  store.get.mockResolvedValue(order);
+  stores.orders.find.mockResolvedValue(order);
   const dispatch = jest.spyOn(bus, 'dispatch');
   const response = await request(app)
     .get(`/orders/${order.id}`)
@@ -187,7 +179,7 @@ test.each([
       });
 
     expect(response.status).toBe(400);
-    expect(store.receive).not.toHaveBeenCalled();
+    expect(stores.payments.transaction).not.toHaveBeenCalled();
   },
 );
 
@@ -211,7 +203,7 @@ test('middleware accepts an unknown error implementing IRespondable', async () =
       };
     }
   }
-  store.get.mockRejectedValue(new RateLimited());
+  stores.orders.find.mockRejectedValue(new RateLimited());
   const response = await request(app)
     .get(`/orders/${order.id}`)
     .set('Authorization', `Bearer ${configuration.apiKey}`);
@@ -228,7 +220,7 @@ test.each([
 ])(
   'middleware handles non-respondable errors without leaking details: %s',
   async (error) => {
-    store.get.mockRejectedValue(error);
+    stores.orders.find.mockRejectedValue(error);
     const log = jest.spyOn(console, 'error').mockImplementation(() => {});
     const response = await request(app)
       .get(`/orders/${order.id}`)
@@ -250,7 +242,7 @@ test.each(['', 'x'.repeat(129)])(
       .set('Idempotency-Key', key)
       .send(checkoutPayload);
     expect(response.status).toBe(400);
-    expect(store.create).not.toHaveBeenCalled();
+    expect(stores.checkout.transaction).not.toHaveBeenCalled();
   },
 );
 
@@ -264,7 +256,7 @@ test.each(['iso-8859-1', 'unsupported'])(
       .send(JSON.stringify(checkoutPayload));
     expect(response.status).toBe(415);
     expect(response.body.error).toBe('Invalid JSON body');
-    expect(store.create).not.toHaveBeenCalled();
+    expect(stores.checkout.transaction).not.toHaveBeenCalled();
   },
 );
 
@@ -275,7 +267,7 @@ test('unsupported content encoding remains a client error', async () => {
     .set('Content-Encoding', 'unsupported')
     .send(checkoutPayload);
   expect(response.status).toBe(415);
-  expect(store.create).not.toHaveBeenCalled();
+  expect(stores.checkout.transaction).not.toHaveBeenCalled();
 });
 
 test.each(['a\u0000b', '\ud800', '\udc00'])(
@@ -290,7 +282,7 @@ test.each(['a\u0000b', '\ud800', '\udc00'])(
       .send({ eventId: identifier, orderId: order.id, outcome: 'succeeded' });
     expect(checkout.status).toBe(400);
     expect(webhook.status).toBe(400);
-    expect(store.create).not.toHaveBeenCalled();
-    expect(store.receive).not.toHaveBeenCalled();
+    expect(stores.checkout.transaction).not.toHaveBeenCalled();
+    expect(stores.payments.transaction).not.toHaveBeenCalled();
   },
 );

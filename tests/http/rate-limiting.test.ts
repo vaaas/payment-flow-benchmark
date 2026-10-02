@@ -5,7 +5,7 @@ import { installFeatures } from '#src/bootstrap/install-features';
 import { Configuration } from '#src/configuration/configuration';
 import { CheckoutConflict } from '#src/features/checkout/domain/checkout-conflict';
 import { Order } from '#src/features/orders/domain/order';
-import { OrderStore } from '#src/features/orders/domain/order-store';
+import { createStoreFakes } from '#tests/support/store-fakes';
 import { App } from '#src/http/app';
 import { RateLimiter } from '#src/http/rate-limiting/rate-limiter';
 
@@ -30,20 +30,19 @@ function fixture() {
     RATE_LIMIT_MAX: '2',
     RATE_LIMIT_WINDOW_MS: '2500',
   });
-  const store: jest.Mocked<OrderStore> = {
-    create: jest.fn().mockResolvedValue({ order, created: true }),
-    get: jest.fn().mockResolvedValue(order),
-    receive: jest.fn().mockResolvedValue({ duplicate: false }),
-  };
+  const stores = createStoreFakes();
+  stores.checkout.transaction.mockResolvedValue({ order, created: true });
+  stores.orders.find.mockResolvedValue(order);
+  stores.payments.transaction.mockResolvedValue({ duplicate: false });
   const container = new Container()
     .registerInstance(Configuration, configuration)
-    .registerInstance(OrderStore, store)
+    .install(stores.install)
     .registerInstance(RateLimiter, new RateLimiter(configuration, () => now));
   const app = container.get(App).install(installFeatures).http;
   const authorization = `Bearer ${configuration.apiKey}`;
   return {
     app,
-    store,
+    stores,
     advance: (milliseconds: number) => {
       now += milliseconds;
     },
@@ -60,7 +59,7 @@ function fixture() {
 }
 
 test('private routes share a budget and rejected requests never reach persistence', async () => {
-  const { checkout, lookup, store } = fixture();
+  const { checkout, lookup, stores } = fixture();
   expect((await checkout()).status).toBe(201);
   expect((await lookup()).status).toBe(200);
   for (const response of await Promise.all([checkout(), lookup()])) {
@@ -68,8 +67,8 @@ test('private routes share a budget and rejected requests never reach persistenc
     expect(response.headers['retry-after']).toBe('3');
     expect(response.body).toEqual({ error: 'Too many requests; retry later' });
   }
-  expect(store.create).toHaveBeenCalledTimes(1);
-  expect(store.get).toHaveBeenCalledTimes(1);
+  expect(stores.checkout.transaction).toHaveBeenCalledTimes(1);
+  expect(stores.orders.find).toHaveBeenCalledTimes(1);
 });
 
 test('rejected requests do not extend the window and the budget resets at its boundary', async () => {
@@ -87,7 +86,7 @@ test('rejected requests do not extend the window and the budget resets at its bo
 });
 
 test('a concurrent burst cannot exceed the private-route budget', async () => {
-  const { checkout, store } = fixture();
+  const { checkout, stores } = fixture();
   const responses = await Promise.all(
     Array.from({ length: 20 }, () =>
       checkout().set('Idempotency-Key', 'repeated-submit'),
@@ -99,7 +98,7 @@ test('a concurrent burst cannot exceed the private-route budget', async () => {
   expect(responses.filter((response) => response.status === 429)).toHaveLength(
     18,
   );
-  expect(store.create).toHaveBeenCalledTimes(2);
+  expect(stores.checkout.transaction).toHaveBeenCalledTimes(2);
 });
 
 test('failed authentication does not consume the shared authenticated budget', async () => {
@@ -114,15 +113,15 @@ test('failed authentication does not consume the shared authenticated budget', a
 });
 
 test('processing failures count toward the request limit', async () => {
-  const { checkout, lookup, store } = fixture();
-  store.create.mockRejectedValueOnce(new CheckoutConflict());
+  const { checkout, lookup, stores } = fixture();
+  stores.checkout.transaction.mockRejectedValueOnce(new CheckoutConflict());
   expect((await checkout()).status).toBe(409);
   expect((await lookup()).status).toBe(200);
   expect((await lookup()).status).toBe(429);
 });
 
 test('provider retries and OpenAPI remain available after private capacity is exhausted', async () => {
-  const { app, lookup, store } = fixture();
+  const { app, lookup, stores } = fixture();
   await lookup();
   await lookup();
   expect((await lookup()).status).toBe(429);
@@ -142,5 +141,5 @@ test('provider retries and OpenAPI remain available after private capacity is ex
       'Retry-After'
     ],
   ).toBeDefined();
-  expect(store.receive).toHaveBeenCalledTimes(1);
+  expect(stores.payments.transaction).toHaveBeenCalledTimes(1);
 });

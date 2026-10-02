@@ -1,8 +1,8 @@
 import { Event } from '#src/application/event';
-import type { OrderStore } from '#src/features/orders/domain/order-store';
+import type { Order } from '#src/features/orders/domain/order';
 import { z } from 'zod';
 
-export class GetOrder extends Event<Awaited<ReturnType<OrderStore['get']>>> {
+export class GetOrder extends Event<Order> {
   private static readonly schema = z.object({ id: z.uuid() });
 
   public static from(input: unknown): GetOrder {

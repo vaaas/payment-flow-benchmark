@@ -6,7 +6,7 @@ import { Container } from '#src/application/dependency-injection/container';
 import { installCheckoutFeature } from '#src/features/checkout/install-checkout-feature';
 import { GetOrder } from '#src/features/orders/domain/get-order';
 import { Order } from '#src/features/orders/domain/order';
-import { OrderStore } from '#src/features/orders/domain/order-store';
+import { createStoreFakes } from '#tests/support/store-fakes';
 import { App } from '#src/http/app';
 
 test('one feature installation wires its dependencies, events and routes without installing other features', async () => {
@@ -23,17 +23,14 @@ test('one feature installation wires its dependencies, events and routes without
     createdAt: '2026-10-01T10:00:00.000Z',
     updatedAt: '2026-10-01T10:00:00.000Z',
   });
-  const store: jest.Mocked<OrderStore> = {
-    create: jest.fn().mockResolvedValue({ order, created: true }),
-    receive: jest.fn(),
-    get: jest.fn(),
-  };
+  const stores = createStoreFakes();
+  stores.checkout.transaction.mockResolvedValue({ order, created: true });
   const configuration = Configuration.fromEnv({
     DATABASE_URL: 'postgresql://postgres:benchmark@database:5432/checkout_test',
   });
   const container = new Container()
     .registerInstance(Configuration, configuration)
-    .registerInstance(OrderStore, store);
+    .install(stores.install);
   const app = container.get(App);
   expect(
     (
@@ -50,10 +47,7 @@ test('one feature installation wires its dependencies, events and routes without
     .send(payload);
   expect(response.status).toBe(201);
   expect(response.body.id).toBe(order.id);
-  expect(store.create).toHaveBeenCalledWith(
-    { ...payload, currency: Currency.of(payload.currency) },
-    undefined,
-  );
+  expect(stores.checkout.transaction).toHaveBeenCalledTimes(1);
   expect(
     (
       await request(app.http)
@@ -67,6 +61,6 @@ test('one feature installation wires its dependencies, events and routes without
   await expect(
     container.get(Bus).dispatch(GetOrder.from({ id: order.id })),
   ).rejects.toThrow('No handler registered for GetOrder');
-  expect(store.get).not.toHaveBeenCalled();
-  expect(store.receive).not.toHaveBeenCalled();
+  expect(stores.orders.find).not.toHaveBeenCalled();
+  expect(stores.payments.transaction).not.toHaveBeenCalled();
 });

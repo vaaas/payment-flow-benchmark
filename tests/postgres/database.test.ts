@@ -4,11 +4,10 @@ import type { PoolConfig } from 'pg';
 import { Container } from '#src/application/dependency-injection/container';
 import { installFeatures } from '#src/bootstrap/install-features';
 import { Configuration } from '#src/configuration/configuration';
-import { OrderStore } from '#src/features/orders/domain/order-store';
 import { App } from '#src/http/app';
 import { Database } from '#src/infrastructure/postgres/database';
 import { DatabaseUnavailable } from '#src/infrastructure/postgres/database-unavailable';
-import { PostgresOrderStore } from '#src/infrastructure/postgres/postgres-order-store';
+import { installPostgresStores } from '#src/bootstrap/install-postgres-stores';
 import { migrate } from '#src/infrastructure/postgres/migrate';
 
 const configuration = Configuration.fromEnv();
@@ -34,7 +33,7 @@ function createApp(database: Database): App {
   const container = new Container()
     .registerInstance(Configuration, configuration)
     .registerInstance(Database, database)
-    .register(OrderStore, PostgresOrderStore);
+    .install(installPostgresStores);
   return container.get(App).install(installFeatures);
 }
 
